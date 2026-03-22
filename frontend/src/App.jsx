@@ -1,3 +1,4 @@
+import React, { useState, useEffect } from 'react';
 import { BedrockPassportProvider } from "@bedrock_org/passport";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { http, createConfig, WagmiProvider } from "wagmi";
@@ -28,6 +29,70 @@ import NotFound from './pages/NotFound';
 
 const queryClient = new QueryClient();
 
+// Global variable to track WalletConnect initialization
+let walletConnectInitialized = false;
+
+// Suppress WalletConnect initialization warnings
+const originalConsoleWarn = console.warn;
+console.warn = function(msg, ...args) {
+  if (typeof msg === 'string' && (
+    msg.includes('WalletConnect Core is already initialized') ||
+    msg.includes('Firebase') ||
+    msg.includes('CONFIGURATION_NOT_FOUND')
+  )) {
+    return;
+  }
+  originalConsoleWarn(msg, ...args);
+};
+
+// PassportProvider wrapper component
+const PassportProvider = ({ children }) => {
+  const [isReady, setIsReady] = useState(false);
+  const [providerInstance, setProviderInstance] = useState(null);
+
+  useEffect(() => {
+    if (!isReady) {
+      setIsReady(true);
+    }
+
+    return () => {
+      if (providerInstance && typeof providerInstance.removeAllListeners === 'function') {
+        providerInstance.removeAllListeners();
+      }
+      walletConnectInitialized = false;
+    };
+  }, [isReady, providerInstance]);
+
+  const handleError = (error) => {
+    console.log('Auth provider error handled:', error.message);
+    if (error.message.includes('Firebase') || error.message.includes('CONFIGURATION_NOT_FOUND')) {
+      return;
+    }
+  };
+
+  const handleProviderInit = (provider) => {
+    walletConnectInitialized = true;
+    setProviderInstance(provider);
+  };
+
+  return isReady ? (
+    <BedrockPassportProvider
+      baseUrl="https://api.bedrockpassport.com"
+      authCallbackUrl="https://quizard-gljo.onrender.com/auth/callback"
+      tenantId="orangeid-zEFEgXMII3"
+      redirectionState={{}}
+      passportOptions={{
+        autoConnect: !walletConnectInitialized,
+        cacheProvider: true,
+        onProviderInit: handleProviderInit,
+        onError: handleError
+      }}
+    >
+      {children}
+    </BedrockPassportProvider>
+  ) : null;
+};
+
 function App() {
   // Wagmi configuration
   const config = createConfig({
@@ -40,14 +105,7 @@ function App() {
   return (
     <WagmiProvider config={config}>
       <QueryClientProvider client={queryClient}>
-        <BedrockPassportProvider
-          baseUrl={import.meta.env.VITE_BEDROCK_BASE_URL}
-          authCallbackUrl={import.meta.env.VITE_BEDROCK_AUTH_CALLBACK_URL}
-          tenantId={import.meta.env.VITE_BEDROCK_TENANT_ID}
-          subscriptionKey={import.meta.env.VITE_BEDROCK_SUBSCRIPTION_KEY}
-          defaultChainId={1}
-          isBeta={false}
-        >
+        <PassportProvider>
           <Router>
             <AuthProvider>
               <ChallengeProvider>
@@ -78,7 +136,7 @@ function App() {
               </ChallengeProvider>
             </AuthProvider>
           </Router>
-        </BedrockPassportProvider>
+        </PassportProvider>
       </QueryClientProvider>
     </WagmiProvider>
   );

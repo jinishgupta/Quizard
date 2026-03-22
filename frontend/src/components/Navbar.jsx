@@ -21,8 +21,26 @@ export default function Navbar({ credits, notificationCount = 0 }) {
   const [showUserMenu, setShowUserMenu] = useState(false);
 
   const handleLogout = async () => {
+    // Clean up all Bedrock Passport localStorage keys
+    const keysToRemove = [
+      'bedrock_passport_token',
+      'bedrock_passport_refresh_token',
+      'bedrock_passport_user',
+      'bedrock_passport_wallet',
+      'WEB3_CONNECT_CACHED_PROVIDER',
+      'walletconnect',
+      'WALLETCONNECT_DEEPLINK_CHOICE'
+    ];
+    
+    keysToRemove.forEach(key => {
+      localStorage.removeItem(key);
+    });
+    
+    // Call Bedrock Passport signOut
     await logout();
-    navigate('/login');
+    
+    // Redirect to login
+    window.location.href = '/login';
   };
 
   return (
