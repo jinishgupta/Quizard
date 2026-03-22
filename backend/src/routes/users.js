@@ -182,11 +182,15 @@ router.get('/:id', authenticate, async (req, res) => {
  */
 router.get('/:id/stats', authenticate, async (req, res) => {
   try {
-    const { id } = req.params;
+    console.log('\n=== GET USER STATS ===');
+    // Use authenticated user's database ID instead of URL parameter
+    const userId = req.user.id;
+    console.log('Using database user ID:', userId);
 
-    const user = await User.findById(id);
+    const user = await User.findById(userId);
 
     if (!user) {
+      console.log('❌ User not found');
       return res.status(404).json({
         error: {
           code: 'RESOURCE_NOT_FOUND',
@@ -200,6 +204,9 @@ router.get('/:id/stats', authenticate, async (req, res) => {
     const accuracy = user.total_questions > 0
       ? ((user.total_correct / user.total_questions) * 100).toFixed(2)
       : 0;
+
+    console.log('✅ Stats retrieved successfully');
+    console.log('=== GET USER STATS SUCCESS ===\n');
 
     res.json({
       userId: user.id,
@@ -215,11 +222,14 @@ router.get('/:id/stats', authenticate, async (req, res) => {
       },
     });
   } catch (error) {
-    console.error('Get user stats error:', error);
+    console.error('❌ GET USER STATS ERROR:', error);
+    console.error('Error stack:', error.stack);
+    console.log('=== GET USER STATS FAILED ===\n');
     res.status(500).json({
       error: {
         code: 'SERVER_INTERNAL_ERROR',
         message: 'Failed to retrieve user statistics',
+        details: error.message,
         timestamp: new Date().toISOString(),
       },
     });
@@ -232,7 +242,10 @@ router.get('/:id/stats', authenticate, async (req, res) => {
  */
 router.get('/:id/badges', authenticate, async (req, res) => {
   try {
-    const { id } = req.params;
+    console.log('\n=== GET USER BADGES ===');
+    // Use authenticated user's database ID instead of URL parameter
+    const userId = req.user.id;
+    console.log('Using database user ID:', userId);
 
     // Get all badges
     const { data: allBadges, error: badgesError } = await supabase
@@ -246,7 +259,7 @@ router.get('/:id/badges', authenticate, async (req, res) => {
     const { data: earnedBadges, error: earnedError } = await supabase
       .from('user_badges')
       .select('badge_id, earned_at')
-      .eq('user_id', id);
+      .eq('user_id', userId);
 
     if (earnedError) throw earnedError;
 
@@ -288,8 +301,12 @@ router.get('/:id/mastery', authenticate, async (req, res) => {
   try {
     console.log('\n=== GET USER MASTERY ===');
     const { id } = req.params;
-    console.log('User ID:', id);
-    console.log('Authenticated user:', req.user?.id);
+    console.log('URL User ID:', id);
+    console.log('Authenticated user ID:', req.user?.id);
+    
+    // Use authenticated user's database ID instead of URL parameter
+    const userId = req.user.id;
+    console.log('Using database user ID:', userId);
 
     // Get all active categories
     console.log('Fetching all categories...');
@@ -298,7 +315,7 @@ router.get('/:id/mastery', authenticate, async (req, res) => {
 
     // Get user's mastery data
     console.log('Fetching user mastery data...');
-    const userMastery = await Category.getUserMastery(id);
+    const userMastery = await Category.getUserMastery(userId);
     console.log('Found mastery records:', userMastery.length);
 
     // Create a map of user's mastery by category ID
@@ -340,7 +357,7 @@ router.get('/:id/mastery', authenticate, async (req, res) => {
     console.log('=== GET USER MASTERY SUCCESS ===\n');
 
     res.json({
-      userId: id,
+      userId: userId,
       mastery,
     });
   } catch (error) {
