@@ -12,12 +12,16 @@ const router = express.Router();
  */
 router.get('/profile', authenticate, async (req, res) => {
   try {
+    console.log('\n=== GET USER PROFILE ===');
     const userId = req.user.id;
+    console.log('User ID:', userId);
 
     // Get user profile with related data
+    console.log('Fetching user profile...');
     const profile = await User.getProfile(userId);
 
     if (!profile) {
+      console.log('❌ User profile not found');
       return res.status(404).json({
         error: {
           code: 'RESOURCE_NOT_FOUND',
@@ -27,10 +31,15 @@ router.get('/profile', authenticate, async (req, res) => {
       });
     }
 
+    console.log('✅ Profile found:', profile.username);
+
     // Calculate overall accuracy
     const accuracy = profile.total_questions > 0
       ? ((profile.total_correct / profile.total_questions) * 100).toFixed(2)
       : 0;
+
+    console.log('Profile stats - Rounds:', profile.total_rounds, 'Accuracy:', accuracy + '%');
+    console.log('=== GET USER PROFILE SUCCESS ===\n');
 
     res.json({
       id: profile.id,
@@ -57,11 +66,14 @@ router.get('/profile', authenticate, async (req, res) => {
       createdAt: profile.created_at,
     });
   } catch (error) {
-    console.error('Get profile error:', error);
+    console.error('❌ GET USER PROFILE ERROR:', error);
+    console.error('Error stack:', error.stack);
+    console.log('=== GET USER PROFILE FAILED ===\n');
     res.status(500).json({
       error: {
         code: 'SERVER_INTERNAL_ERROR',
         message: 'Failed to retrieve user profile',
+        details: error.message,
         timestamp: new Date().toISOString(),
       },
     });
@@ -274,13 +286,20 @@ router.get('/:id/badges', authenticate, async (req, res) => {
  */
 router.get('/:id/mastery', authenticate, async (req, res) => {
   try {
+    console.log('\n=== GET USER MASTERY ===');
     const { id } = req.params;
+    console.log('User ID:', id);
+    console.log('Authenticated user:', req.user?.id);
 
     // Get all active categories
+    console.log('Fetching all categories...');
     const allCategories = await Category.getAll();
+    console.log('Found categories:', allCategories.length);
 
     // Get user's mastery data
+    console.log('Fetching user mastery data...');
     const userMastery = await Category.getUserMastery(id);
+    console.log('Found mastery records:', userMastery.length);
 
     // Create a map of user's mastery by category ID
     const masteryMap = new Map(userMastery.map(m => [m.category_id, m]));
@@ -317,16 +336,22 @@ router.get('/:id/mastery', authenticate, async (req, res) => {
       }
     });
 
+    console.log('✅ Mastery data prepared successfully');
+    console.log('=== GET USER MASTERY SUCCESS ===\n');
+
     res.json({
       userId: id,
       mastery,
     });
   } catch (error) {
-    console.error('Get user mastery error:', error);
+    console.error('❌ GET USER MASTERY ERROR:', error);
+    console.error('Error stack:', error.stack);
+    console.log('=== GET USER MASTERY FAILED ===\n');
     res.status(500).json({
       error: {
         code: 'SERVER_INTERNAL_ERROR',
         message: 'Failed to retrieve user mastery',
+        details: error.message,
         timestamp: new Date().toISOString(),
       },
     });

@@ -3,6 +3,7 @@ import cors from 'cors';
 import { createServer } from 'http';
 import { Server } from 'socket.io';
 import { config, validateConfig } from './config/env.js';
+import { requestLogger, errorLogger } from './middleware/logger.js';
 import authRoutes from './routes/auth.js';
 import creditsRoutes from './routes/credits.js';
 import gameRoutes from './routes/game.js';
@@ -36,6 +37,9 @@ app.use(cors());
 app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
 
+// Request logging middleware (logs all requests)
+app.use(requestLogger);
+
 // Health check endpoint
 app.get('/health', (req, res) => {
   res.status(200).json({
@@ -63,6 +67,9 @@ app.use('/api/ai', aiRoutes);
 app.use('/api/challenge', challengeRoutes);
 app.use('/api/telemetry', telemetryRoutes);
 app.use('/api/admin', adminRoutes);
+
+// Error logging middleware (must be after routes)
+app.use(errorLogger);
 
 // Root endpoint
 app.get('/', (req, res) => {
@@ -313,11 +320,38 @@ io.on('connection', (socket) => {
 // Start server
 function startServer() {
   try {
+    console.log('\n========================================');
+    console.log('🚀 STARTING QUIZARD BACKEND SERVER');
+    console.log('========================================');
+    
     validateConfig();
     
+    console.log('\n📋 Configuration:');
+    console.log('  - Environment:', config.server.nodeEnv);
+    console.log('  - Host:', config.server.host);
+    console.log('  - Port:', config.server.port);
+    console.log('  - Database:', config.database.url ? 'Connected' : 'Not configured');
+    console.log('  - Bedrock Tenant ID:', config.bedrock.tenantId);
+    console.log('  - Bedrock Base URL:', config.bedrock.baseUrl);
+    console.log('  - Orange Game Pass API:', config.orange.gamePassApiUrl);
+    console.log('  - Gemini API Key:', config.gemini.apiKey ? 'Present' : 'Missing');
+    
     httpServer.listen(config.server.port, config.server.host, () => {
-      console.log(`Server running on http://${config.server.host}:${config.server.port}`);
-      console.log(`Environment: ${config.server.nodeEnv}`);
+      console.log('\n✅ Server running on http://' + config.server.host + ':' + config.server.port);
+      console.log('✅ Environment:', config.server.nodeEnv);
+      console.log('\n📡 Available endpoints:');
+      console.log('  - GET  /health');
+      console.log('  - GET  /ready');
+      console.log('  - POST /api/auth/*');
+      console.log('  - GET  /api/users/*');
+      console.log('  - GET  /api/credits/*');
+      console.log('  - POST /api/game/*');
+      console.log('  - GET  /api/league/*');
+      console.log('  - POST /api/challenge/*');
+      console.log('  - POST /api/ai/*');
+      console.log('\n========================================');
+      console.log('✅ SERVER READY - Waiting for requests...');
+      console.log('========================================\n');
       
       // Start league reset scheduler (Sunday 00:00 UTC)
       leagueResetScheduler.start();
@@ -326,7 +360,8 @@ function startServer() {
       weeklyDigestScheduler.start();
     });
   } catch (error) {
-    console.error('Failed to start server:', error.message);
+    console.error('\n❌ FAILED TO START SERVER:', error.message);
+    console.error('Error stack:', error.stack);
     process.exit(1);
   }
 }

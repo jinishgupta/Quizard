@@ -12,20 +12,6 @@ const addRefreshSubscriber = (callback) => {
   refreshSubscribers.push(callback);
 };
 
-const API_URL = import.meta.env.VITE_API_URL;
-
-let isRefreshing = false;
-let refreshSubscribers = [];
-
-const onRefreshed = (token) => {
-  refreshSubscribers.forEach((callback) => callback(token));
-  refreshSubscribers = [];
-};
-
-const addRefreshSubscriber = (callback) => {
-  refreshSubscribers.push(callback);
-};
-
 /**
  * Get the Bedrock Passport token from localStorage
  * Bedrock Passport can store tokens under different keys depending on auth method
@@ -150,6 +136,13 @@ const refreshAccessToken = async () => {
  */
 export const apiRequest = async (endpoint, options = {}) => {
   const token = getBedrockToken();
+  
+  // Debug logging
+  if (!token) {
+    console.warn('No Bedrock token found in localStorage');
+  } else {
+    console.log('Sending request with token (first 20 chars):', token.substring(0, 20) + '...');
+  }
   
   const defaultHeaders = {
     'Content-Type': 'application/json',

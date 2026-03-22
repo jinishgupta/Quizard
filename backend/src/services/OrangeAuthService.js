@@ -19,6 +19,12 @@ export class OrangeAuthService {
    */
   async verifyToken(token) {
     try {
+      console.log('\n=== ORANGE AUTH SERVICE - VERIFY TOKEN ===');
+      console.log('Base URL:', this.baseUrl);
+      console.log('Tenant ID:', this.tenantId);
+      console.log('Subscription Key:', this.subscriptionKey ? 'Present' : 'Missing');
+      console.log('Token (first 20 chars):', token.substring(0, 20) + '...');
+      
       const response = await fetch(`${this.baseUrl}/api/v1/auth/user`, {
         method: 'GET',
         headers: {
@@ -29,14 +35,28 @@ export class OrangeAuthService {
         },
       });
 
+      console.log('Orange API Response Status:', response.status);
+
       if (!response.ok) {
-        const error = await response.json().catch(() => ({}));
+        const errorText = await response.text();
+        console.log('❌ Orange API Error Response:', errorText);
+        let error;
+        try {
+          error = JSON.parse(errorText);
+        } catch (e) {
+          error = { message: errorText };
+        }
         throw new Error(error.message || `Token verification failed: ${response.status}`);
       }
 
       const userData = await response.json();
+      console.log('✅ Token verified successfully');
+      console.log('User data:', JSON.stringify(userData, null, 2));
+      console.log('=== ORANGE AUTH SERVICE SUCCESS ===\n');
       return userData;
     } catch (error) {
+      console.log('❌ ORANGE AUTH SERVICE ERROR:', error.message);
+      console.log('=== ORANGE AUTH SERVICE FAILED ===\n');
       throw new Error(`Failed to verify token: ${error.message}`);
     }
   }
