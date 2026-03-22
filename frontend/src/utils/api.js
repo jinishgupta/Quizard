@@ -13,10 +13,26 @@ const addRefreshSubscriber = (callback) => {
 };
 
 /**
+ * Get the Bedrock Passport token from localStorage
+ */
+const getBedrockToken = () => {
+  // Bedrock Passport stores token with this key
+  return localStorage.getItem('bedrock_passport_token');
+};
+
+/**
+ * Get the Bedrock Passport refresh token from localStorage
+ */
+const getBedrockRefreshToken = () => {
+  // Bedrock Passport stores refresh token with this key
+  return localStorage.getItem('bedrock_passport_refresh_token');
+};
+
+/**
  * Refresh the access token
  */
 const refreshAccessToken = async () => {
-  const refreshToken = localStorage.getItem('orange_refresh_token');
+  const refreshToken = getBedrockRefreshToken();
   
   if (!refreshToken) {
     throw new Error('No refresh token available');
@@ -35,8 +51,8 @@ const refreshAccessToken = async () => {
   }
 
   const data = await response.json();
-  localStorage.setItem('orange_token', data.token);
-  localStorage.setItem('orange_refresh_token', data.refreshToken);
+  localStorage.setItem('bedrock_passport_token', data.token);
+  localStorage.setItem('bedrock_passport_refresh_token', data.refreshToken);
   
   return data.token;
 };
@@ -48,7 +64,7 @@ const refreshAccessToken = async () => {
  * @returns {Promise<any>} Response data
  */
 export const apiRequest = async (endpoint, options = {}) => {
-  const token = localStorage.getItem('orange_token');
+  const token = getBedrockToken();
   
   const defaultHeaders = {
     'Content-Type': 'application/json',
@@ -91,9 +107,9 @@ export const apiRequest = async (endpoint, options = {}) => {
       } catch (error) {
         isRefreshing = false;
         // Clear tokens and redirect to login
-        localStorage.removeItem('orange_token');
-        localStorage.removeItem('orange_refresh_token');
-        localStorage.removeItem('user');
+        localStorage.removeItem('bedrock_passport_token');
+        localStorage.removeItem('bedrock_passport_refresh_token');
+        localStorage.removeItem('bedrock_passport_user');
         window.location.href = '/login';
         throw error;
       }
