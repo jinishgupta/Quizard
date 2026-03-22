@@ -80,6 +80,7 @@ const PassportProvider = ({ children }) => {
       baseUrl="https://api.bedrockpassport.com"
       authCallbackUrl="https://quizard-gljo.onrender.com/auth/callback"
       tenantId="orangeid-zEFEgXMII3"
+      subscriptionKey="65c863c47911431abbc97f610f0fbba1"
       redirectionState={{}}
       passportOptions={{
         autoConnect: !walletConnectInitialized,
