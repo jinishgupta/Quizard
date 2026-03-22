@@ -12,20 +12,105 @@ const addRefreshSubscriber = (callback) => {
   refreshSubscribers.push(callback);
 };
 
+const API_URL = import.meta.env.VITE_API_URL;
+
+let isRefreshing = false;
+let refreshSubscribers = [];
+
+const onRefreshed = (token) => {
+  refreshSubscribers.forEach((callback) => callback(token));
+  refreshSubscribers = [];
+};
+
+const addRefreshSubscriber = (callback) => {
+  refreshSubscribers.push(callback);
+};
+
 /**
  * Get the Bedrock Passport token from localStorage
+ * Bedrock Passport can store tokens under different keys depending on auth method
  */
 const getBedrockToken = () => {
-  // Bedrock Passport stores token with this key
-  return localStorage.getItem('bedrock_passport_token');
+  // First try the standard key we set in AuthContext
+  let token = localStorage.getItem('bedrock_passport_token');
+  if (token) return token;
+  
+  // Try other possible keys where Bedrock Passport might store the token
+  const possibleKeys = [
+    'bedrockPassportToken',
+    'bp_token',
+    'accessToken'
+  ];
+  
+  for (const key of possibleKeys) {
+    token = localStorage.getItem(key);
+    if (token) {
+      return token;
+    }
+  }
+  
+  // Also check if token is stored in a JSON object
+  try {
+    const bedrockData = localStorage.getItem('bedrock_passport_user');
+    if (bedrockData) {
+      const parsed = JSON.parse(bedrockData);
+      if (parsed.token || parsed.accessToken) {
+        return parsed.token || parsed.accessToken;
+      }
+    }
+  } catch (e) {
+    // Ignore parse errors
+  }
+  
+  // Last resort: check all localStorage keys for anything that looks like a JWT
+  try {
+    for (let i = 0; i < localStorage.length; i++) {
+      const key = localStorage.key(i);
+      const value = localStorage.getItem(key);
+      // JWT tokens start with "eyJ"
+      if (value && typeof value === 'string' && value.startsWith('eyJ') && value.split('.').length === 3) {
+        console.log('Found potential JWT token in localStorage key:', key);
+        return value;
+      }
+    }
+  } catch (e) {
+    // Ignore errors
+  }
+  
+  return null;
 };
 
 /**
  * Get the Bedrock Passport refresh token from localStorage
  */
 const getBedrockRefreshToken = () => {
-  // Bedrock Passport stores refresh token with this key
-  return localStorage.getItem('bedrock_passport_refresh_token');
+  const possibleKeys = [
+    'bedrock_passport_refresh_token',
+    'bedrockPassportRefreshToken',
+    'bp_refresh_token',
+    'refreshToken'
+  ];
+  
+  for (const key of possibleKeys) {
+    const token = localStorage.getItem(key);
+    if (token) {
+      return token;
+    }
+  }
+  
+  try {
+    const bedrockData = localStorage.getItem('bedrock_passport_user');
+    if (bedrockData) {
+      const parsed = JSON.parse(bedrockData);
+      if (parsed.refreshToken) {
+        return parsed.refreshToken;
+      }
+    }
+  } catch (e) {
+    // Ignore parse errors
+  }
+  
+  return null;
 };
 
 /**

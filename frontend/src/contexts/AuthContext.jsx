@@ -1,4 +1,4 @@
-import { createContext, useContext } from 'react';
+import { createContext, useContext, useEffect } from 'react';
 import { useBedrockPassport } from '@bedrock_org/passport';
 
 const AuthContext = createContext(null);
@@ -15,14 +15,31 @@ export const AuthProvider = ({ children }) => {
   // Use Bedrock Passport hook directly
   const bedrockAuth = useBedrockPassport();
 
+  // Store token in localStorage when user logs in
+  useEffect(() => {
+    if (bedrockAuth.isLoggedIn && bedrockAuth.user) {
+      // Try to get token from the hook or localStorage
+      const token = bedrockAuth.token || bedrockAuth.accessToken;
+      
+      if (token) {
+        localStorage.setItem('bedrock_passport_token', token);
+      }
+      
+      // Store user data
+      if (bedrockAuth.user) {
+        localStorage.setItem('bedrock_passport_user', JSON.stringify(bedrockAuth.user));
+      }
+    }
+  }, [bedrockAuth.isLoggedIn, bedrockAuth.user, bedrockAuth.token, bedrockAuth.accessToken]);
+
   // Simply pass through the Bedrock Passport values
   const value = {
     user: bedrockAuth.user,
     isAuthenticated: bedrockAuth.isLoggedIn,
     loading: false,
     logout: bedrockAuth.signOut,
+    token: bedrockAuth.token || bedrockAuth.accessToken,
     // Legacy compatibility
-    token: null,
     refreshToken: null,
     login: () => {},
     refreshAccessToken: () => {},

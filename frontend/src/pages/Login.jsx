@@ -1,8 +1,19 @@
-import React from 'react';
-import { LoginPanel } from "@bedrock_org/passport";
+import React, { useEffect } from 'react';
+import { useNavigate } from 'react-router-dom';
+import { LoginPanel, useBedrockPassport } from "@bedrock_org/passport";
 import "@bedrock_org/passport/dist/style.css";
 
 const Login = () => {
+  const navigate = useNavigate();
+  const { isLoggedIn } = useBedrockPassport();
+
+  // Redirect to home dashboard if already logged in
+  useEffect(() => {
+    if (isLoggedIn) {
+      navigate('/home-dashboard');
+    }
+  }, [isLoggedIn, navigate]);
+
   return (
     <div className="flex justify-center items-center min-h-screen">
       <LoginPanel
