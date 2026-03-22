@@ -20,7 +20,7 @@ export default function DailyChallengHero() {
       initial={{ opacity: 0, y: 16 }}
       animate={{ opacity: 1, y: 0 }}
       transition={{ duration: 0.4, ease: 'easeOut' }}
-      className="relative rounded-2xl overflow-hidden noise-texture scanlines"
+      className="relative rounded-3xl overflow-hidden noise-texture scanlines"
       style={{
         background: 'linear-gradient(135deg, #C2410C 0%, #EA580C 30%, #F97316 65%, #FB923C 100%)',
         boxShadow: '0 8px 40px rgba(249,115,22,0.35)',
@@ -115,7 +115,7 @@ export default function DailyChallengHero() {
           <div className="flex flex-col gap-3 md:items-end">
             <Link
               to="/play-screen"
-              className="group inline-flex items-center justify-center gap-2 px-8 py-4 rounded-xl font-black text-lg text-orange-600 transition-all duration-150 hover:scale-105 active:scale-95"
+              className="group inline-flex items-center justify-center gap-2 px-8 py-4 rounded-2xl font-black text-lg text-orange-600 transition-all duration-150 hover:scale-105 active:scale-95"
               style={{
                 background: 'linear-gradient(135deg, #ffffff, #fff7ed)',
                 boxShadow: '0 4px 20px rgba(0,0,0,0.25), inset 0 1px 0 rgba(255,255,255,0.5)',

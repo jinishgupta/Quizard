@@ -2,18 +2,8 @@ import React from 'react';
 import { Link } from 'react-router-dom';
 import { motion } from 'framer-motion';
 import { Star } from 'lucide-react';
-
-const CATEGORIES = [
-  { id: 'cat-geography', name: 'Geography', emoji: '🌍', mastery: 72, masteryLevel: 'Expert', color: '#3b82f6', questions: 240, premium: false },
-  { id: 'cat-movies', name: 'Movies & TV', emoji: '🎬', mastery: 58, masteryLevel: 'Advanced', color: '#8b5cf6', questions: 312, premium: false },
-  { id: 'cat-sports', name: 'Sports', emoji: '⚽', mastery: 45, masteryLevel: 'Intermediate', color: '#22c55e', questions: 280, premium: false },
-  { id: 'cat-science', name: 'Science', emoji: '🔬', mastery: 83, masteryLevel: 'Master', color: '#06b6d4', questions: 195, premium: false },
-  { id: 'cat-music', name: 'Music', emoji: '🎵', mastery: 34, masteryLevel: 'Beginner', color: '#ec4899', questions: 220, premium: false },
-  { id: 'cat-history', name: 'History', emoji: '📜', mastery: 61, masteryLevel: 'Advanced', color: '#f59e0b', questions: 265, premium: false },
-  { id: 'cat-tech', name: 'Tech & AI', emoji: '🤖', mastery: 91, masteryLevel: 'Legend', color: '#f97316', questions: 178, premium: false },
-  { id: 'cat-food', name: 'Food & Culture', emoji: '🍜', mastery: 27, masteryLevel: 'Novice', color: '#ef4444', questions: 198, premium: false },
-  { id: 'cat-custom', name: 'Custom Quiz', emoji: '✨', mastery: 0, masteryLevel: '', color: '#14b8a6', questions: 0, premium: false, isCustom: true },
-];
+import { useCategories, useUserMastery } from '../../hooks/useApi';
+import { useAuth } from '../../contexts/AuthContext';
 
 const MASTERY_COLORS = {
   Legend: '#f97316',
@@ -26,15 +16,71 @@ const MASTERY_COLORS = {
 };
 
 export default function CategoryGrid() {
+  const { user } = useAuth();
+  const { data: categoriesData, isLoading: categoriesLoading } = useCategories();
+  const { data: masteryData, isLoading: masteryLoading } = useUserMastery(user?.id);
+
+  const categories = categoriesData?.categories || [];
+  const masteryMap = {};
+  
+  if (masteryData?.mastery) {
+    masteryData.mastery.forEach(m => {
+      masteryMap[m.categoryId] = m;
+    });
+  }
+
+  // Add custom quiz option
+  const allCategories = [
+    ...categories.map(cat => ({
+      id: cat.id,
+      name: cat.name,
+      emoji: cat.emoji,
+      color: cat.color || '#3b82f6',
+      mastery: masteryMap[cat.id]?.progressPercentage || 0,
+      masteryLevel: masteryMap[cat.id]?.masteryLevel || 'Beginner',
+      questions: masteryMap[cat.id]?.totalQuestions || 0,
+      isCustom: false,
+    })),
+    {
+      id: 'custom',
+      name: 'Custom Quiz',
+      emoji: '✨',
+      color: '#14b8a6',
+      mastery: 0,
+      masteryLevel: '',
+      questions: 0,
+      isCustom: true,
+    },
+  ];
+
+  if (categoriesLoading || masteryLoading) {
+    return (
+      <div>
+        <div className="flex items-center justify-between mb-4">
+          <h2 className="text-lg font-bold text-white">Categories</h2>
+        </div>
+        <div className="grid grid-cols-2 sm:grid-cols-3 gap-3">
+          {[...Array(9)].map((_, i) => (
+            <div
+              key={`skeleton-${i}`}
+              className="h-32 rounded-3xl animate-pulse"
+              style={{ background: 'rgba(30,30,30,0.9)' }}
+            />
+          ))}
+        </div>
+      </div>
+    );
+  }
+
   return (
     <div>
       <div className="flex items-center justify-between mb-4">
         <h2 className="text-lg font-bold text-white">Categories</h2>
-        <span className="text-sm text-gray-500 font-medium">9 available</span>
+        <span className="text-sm text-gray-500 font-medium">{allCategories.length} available</span>
       </div>
 
       <div className="grid grid-cols-2 sm:grid-cols-3 gap-3">
-        {CATEGORIES.map((cat, i) => (
+        {allCategories.map((cat, i) => (
           <motion.div
             key={cat.id}
             initial={{ opacity: 0, y: 12 }}
@@ -43,7 +89,8 @@ export default function CategoryGrid() {
           >
             <Link
               to="/play-screen"
-              className={`block p-4 rounded-card card-hover cursor-pointer relative overflow-hidden ${
+              state={{ categoryId: cat.id, categoryName: cat.name }}
+              className={`block p-4 rounded-3xl card-hover cursor-pointer relative overflow-hidden ${
                 cat.isCustom ? '' : ''
               }`}
               style={{
@@ -57,7 +104,7 @@ export default function CategoryGrid() {
               }}
             >
               <div
-                className="absolute inset-0 opacity-0 hover:opacity-5 transition-opacity duration-150 rounded-card"
+                className="absolute inset-0 opacity-0 hover:opacity-5 transition-opacity duration-150 rounded-3xl"
                 style={{ background: cat.color }}
               />
 
@@ -69,7 +116,7 @@ export default function CategoryGrid() {
                   </div>
                   {cat.masteryLevel && (
                     <span
-                      className="text-xs px-1.5 py-0.5 rounded font-bold"
+                      className="text-xs px-1.5 py-0.5 rounded-xl font-bold"
                       style={{
                         background: `${MASTERY_COLORS[cat.masteryLevel] || '#6b7280'}22`,
                         color: MASTERY_COLORS[cat.masteryLevel] || '#6b7280',

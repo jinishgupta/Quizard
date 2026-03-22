@@ -6,6 +6,7 @@ import Navbar from '../components/Navbar';
 import MobileBottomNav from '../components/MobileBottomNav';
 import PlayerRow from '../components/ui/PlayerRow';
 import Card from '../components/ui/Card';
+import { useLeaderboard, useLeagueRank, useCreditBalance, useUserProfile } from '../hooks/useApi';
 
 const TIERS = ['Bronze', 'Silver', 'Gold', 'Platinum', 'Diamond'];
 
@@ -17,37 +18,48 @@ const TIER_CONFIG = {
   Diamond: { bg: '#1E1B4B', text: '#C7D2FE', border: '#6366F1', emoji: '💠' },
 };
 
-const MY_RANK = {
-  rank: 8,
-  weeklyScore: 2340,
-  pointsToNext: 160,
-  tier: 'Gold',
-};
-
-const LEADERBOARD = [
-  { rank: 1, name: 'NovaMind', avatar: '🦅', weeklyScore: 4820, accuracy: 94, trend: 'same' },
-  { rank: 2, name: 'QuizKing99', avatar: '👑', weeklyScore: 4510, accuracy: 91, trend: 'up' },
-  { rank: 3, name: 'BrainStorm', avatar: '⚡', weeklyScore: 4280, accuracy: 89, trend: 'up' },
-  { rank: 4, name: 'TriviaBot', avatar: '🤖', weeklyScore: 3990, accuracy: 87, trend: 'down' },
-  { rank: 5, name: 'AcePlayer', avatar: '🎯', weeklyScore: 3750, accuracy: 85, trend: 'up' },
-  { rank: 6, name: 'MindBlast', avatar: '💥', weeklyScore: 3520, accuracy: 83, trend: 'same' },
-  { rank: 7, name: 'SwiftThinker', avatar: '🦊', weeklyScore: 2890, accuracy: 80, trend: 'down' },
-  { rank: 8, name: 'Alex Mercer', avatar: '🧠', weeklyScore: 2340, accuracy: 74, trend: 'up', isMe: true },
-  { rank: 9, name: 'CuriousCat', avatar: '🐱', weeklyScore: 2180, accuracy: 72, trend: 'same' },
-  { rank: 10, name: 'DataNerd', avatar: '📊', weeklyScore: 1950, accuracy: 69, trend: 'down' },
-];
-
 const DEMOTION_ZONE = [9, 10];
 const PROMOTION_ZONE = [1, 2, 3];
 
 export default function Leagues() {
   const navigate = useNavigate();
-  const [activeTier, setActiveTier] = useState('Gold');
+  const { data: userProfile } = useUserProfile();
+  const { data: rankResponse } = useLeagueRank();
+  const rankData = rankResponse?.rank;
+  const { data: creditData } = useCreditBalance();
+  
+  const [activeTier, setActiveTier] = useState(rankData?.tier || 'Gold');
+  const { data: leaderboardData } = useLeaderboard(activeTier);
+  
   const tierConfig = TIER_CONFIG[activeTier];
+  const credits = creditData?.balance || 0;
+  
+  // Update active tier when rank data loads
+  React.useEffect(() => {
+    if (rankData?.tier) {
+      setActiveTier(rankData.tier);
+    }
+  }, [rankData?.tier]);
+
+  if (!rankData || !leaderboardData) {
+    return (
+      <div className="min-h-screen bg-[#0A0F1A] flex items-center justify-center">
+        <div className="text-center">
+          <div className="w-16 h-16 border-4 border-primary-500 border-t-transparent rounded-full animate-spin mx-auto mb-4" />
+          <p className="text-white font-semibold">Loading leaderboard...</p>
+        </div>
+      </div>
+    );
+  }
+
+  const myRank = rankData.rank || 0;
+  const weeklyScore = rankData.weeklyScore || 0;
+  const pointsToNext = rankData.pointsToNext || 0;
+  const leaderboard = leaderboardData.leaderboard || [];
 
   return (
     <div className="min-h-screen bg-[#0A0F1A] grid-pattern">
-      <Navbar credits={247} notificationCount={3} />
+      <Navbar credits={credits} notificationCount={3} />
 
       <main className="max-w-3xl mx-auto px-4 md:px-6 pb-28 md:pb-10 pt-6 space-y-5">
 
@@ -78,7 +90,9 @@ export default function Leagues() {
               <div className="text-right">
                 <div className="flex items-center gap-1.5 text-[#9CA3AF] text-sm">
                   <Clock size={14} />
-                  <span className="font-mono font-bold text-white">4d 12h</span>
+                  <span className="font-mono font-bold text-white">
+                    {rankData.timeUntilReset || '6d 23h'}
+                  </span>
                 </div>
                 <p className="text-[10px] text-[#6B7280] mt-0.5">until reset</p>
               </div>
@@ -96,31 +110,33 @@ export default function Leagues() {
               <div>
                 <p className="text-xs text-[#6B7280] font-semibold uppercase tracking-wider mb-1">My Rank</p>
                 <div className="flex items-baseline gap-2">
-                  <span className="text-4xl font-black text-white font-mono">#{MY_RANK.rank}</span>
-                  <div className="flex items-center gap-1 text-green-400 text-sm font-semibold">
-                    <ArrowUp size={14} />
-                    <span>+2</span>
-                  </div>
+                  <span className="text-4xl font-black text-white font-mono">#{myRank}</span>
+                  {rankData.rankChange && rankData.rankChange !== 0 && (
+                    <div className={`flex items-center gap-1 text-sm font-semibold ${rankData.rankChange > 0 ? 'text-green-400' : 'text-red-400'}`}>
+                      {rankData.rankChange > 0 ? <ArrowUp size={14} /> : <ArrowDown size={14} />}
+                      <span>{Math.abs(rankData.rankChange)}</span>
+                    </div>
+                  )}
                 </div>
               </div>
               <div className="text-center">
                 <p className="text-xs text-[#6B7280] mb-1">Weekly Score</p>
-                <p className="text-2xl font-black font-mono text-[#60A5FA]">{MY_RANK.weeklyScore.toLocaleString()}</p>
+                <p className="text-2xl font-black font-mono text-[#60A5FA]">{weeklyScore.toLocaleString()}</p>
               </div>
               <div className="text-right">
                 <p className="text-xs text-[#6B7280] mb-1">To Next Rank</p>
-                <p className="text-lg font-black font-mono text-[#FCD34D]">+{MY_RANK.pointsToNext}</p>
+                <p className="text-lg font-black font-mono text-[#FCD34D]">+{pointsToNext}</p>
                 <p className="text-[10px] text-[#6B7280]">pts needed</p>
               </div>
             </div>
             <div className="mt-4 bg-[#1F2937] rounded-full h-2 overflow-hidden">
               <div
                 className="h-full rounded-full bg-[#1D4ED8] transition-all duration-700"
-                style={{ width: `${(MY_RANK.weeklyScore / (MY_RANK.weeklyScore + MY_RANK.pointsToNext)) * 100}%` }}
+                style={{ width: `${pointsToNext > 0 ? (weeklyScore / (weeklyScore + pointsToNext)) * 100 : 100}%` }}
               />
             </div>
             <p className="text-[10px] text-[#6B7280] mt-1 text-right font-mono">
-              {MY_RANK.weeklyScore} / {MY_RANK.weeklyScore + MY_RANK.pointsToNext}
+              {weeklyScore} / {weeklyScore + pointsToNext}
             </p>
           </Card>
         </motion.div>
@@ -174,7 +190,8 @@ export default function Leagues() {
               <div className="h-px flex-1 bg-green-500/20" />
             </div>
 
-            {LEADERBOARD.map((player, i) => {
+            {leaderboard.map((player, i) => {
+              const isCurrentUser = player.userId === userProfile?.id;
               return (
                 <React.Fragment key={`player-${player.rank}`}>
                   {player.rank === 4 && (
@@ -198,12 +215,12 @@ export default function Leagues() {
                   >
                     <PlayerRow
                       rank={player.rank}
-                      name={player.name}
-                      avatar={player.avatar}
+                      name={player.username || player.displayName || 'Anonymous'}
+                      avatar={player.avatar || '🧠'}
                       weeklyScore={player.weeklyScore}
-                      accuracy={player.accuracy}
-                      isCurrentUser={player.isMe}
-                      trend={player.trend}
+                      accuracy={player.accuracy || 0}
+                      isCurrentUser={isCurrentUser}
+                      trend={player.trend || 'same'}
                     />
                   </motion.div>
                 </React.Fragment>

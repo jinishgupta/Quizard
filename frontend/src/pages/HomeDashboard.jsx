@@ -1,27 +1,33 @@
-import React from 'react';
 import Navbar from '../components/Navbar';
 import MobileBottomNav from '../components/MobileBottomNav';
 import DailyChallengHero from '../components/home-dashboard/DailyChallengHero';
 import StreakBanner from '../components/home-dashboard/StreakBanner';
 import CategoryGrid from '../components/home-dashboard/CategoryGrid';
 import LeagueSidebar from '../components/home-dashboard/LeagueSidebar';
+import { useUserProfile, useCreditBalance } from '../hooks/useApi';
 
 export default function HomeDashboard() {
-  return (
-    <div className="min-h-screen bg-brand-bg grid-pattern">
-      <Navbar credits={247} notificationCount={3} />
+  const { data: profile } = useUserProfile();
+  const { data: creditData } = useCreditBalance();
 
-      <main className="max-w-screen-2xl mx-auto px-4 lg:px-8 xl:px-10 2xl:px-16 pb-24 md:pb-8">
-        <div className="flex gap-6 xl:gap-8 mt-6">
+  const credits = creditData?.balance || 0;
+  const notificationCount = 3; // TODO: Implement notifications
+
+  return (
+    <div className="min-h-screen bg-[#0A0F1A] dot-pattern">
+      <Navbar credits={credits} notificationCount={notificationCount} />
+
+      <main className="max-w-7xl mx-auto px-4 lg:px-6 pb-24 md:pb-8 pt-6">
+        <div className="flex gap-6 lg:gap-8">
           {/* Main content */}
-          <div className="flex-1 min-w-0 space-y-6">
+          <div className="flex-1 min-w-0 space-y-5">
             <DailyChallengHero />
-            <StreakBanner />
+            <StreakBanner profile={profile} />
             <CategoryGrid />
           </div>
 
           {/* Desktop right sidebar */}
-          <aside className="hidden lg:block w-80 xl:w-88 shrink-0">
+          <aside className="hidden lg:block w-80 shrink-0">
             <LeagueSidebar />
           </aside>
         </div>

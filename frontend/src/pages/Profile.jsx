@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useState } from 'react';
 import { motion } from 'framer-motion';
 import { useNavigate } from 'react-router-dom';
 import { Trophy, Target, Zap, Star, Brain, ChevronRight } from 'lucide-react';
@@ -7,50 +7,8 @@ import MobileBottomNav from '../components/MobileBottomNav';
 import BadgeCard from '../components/ui/BadgeCard';
 import StatChip from '../components/ui/StatChip';
 import Card from '../components/ui/Card';
-
-const PLAYER = {
-  name: 'Alex Mercer',
-  playerId: 'TL-7842',
-  avatar: '🧠',
-  streak: 14,
-  totalRounds: 312,
-  accuracy: 74,
-  bestStreak: 22,
-  creditsSpent: 1840,
-  leagueTier: 'Gold',
-  weeklyRank: 8,
-  weeklyScore: 2340,
-};
-
-const WEEKLY_DIGEST = {
-  summary: 'Strong week overall — you dominated Science & Tech but struggled with History. Your speed improved by 18% compared to last week.',
-  strengths: ['Science & Tech', 'Space & Cosmos', 'Code & Dev'],
-  suggestions: ['Review World History timelines', 'Practice Geography capitals'],
-  funFact: 'You answered 47 questions correctly in under 8 seconds each — faster than 91% of players this week.',
-};
-
-const CATEGORY_MASTERY = [
-  { name: 'Science & Tech', emoji: '🔬', level: 'Expert', progress: 82, color: '#1D4ED8' },
-  { name: 'Space & Cosmos', emoji: '🚀', level: 'Expert', progress: 78, color: '#7C3AED' },
-  { name: 'Code & Dev', emoji: '💻', level: 'Adept', progress: 65, color: '#0891B2' },
-  { name: 'World History', emoji: '🏛️', level: 'Adept', progress: 58, color: '#D97706' },
-  { name: 'Pop Culture', emoji: '🎬', level: 'Novice', progress: 42, color: '#DC2626' },
-  { name: 'Geography', emoji: '🌍', level: 'Novice', progress: 35, color: '#16A34A' },
-  { name: 'Music & Arts', emoji: '🎵', level: 'Beginner', progress: 22, color: '#9333EA' },
-  { name: 'Sports', emoji: '⚽', level: 'Beginner', progress: 18, color: '#EA580C' },
-];
-
-const BADGES = [
-  { emoji: '🔥', name: 'On Fire', description: '10-day streak', earned: true, earnedDate: 'Mar 12', rarity: 'rare' },
-  { emoji: '🧠', name: 'Big Brain', description: '100% in any round', earned: true, earnedDate: 'Mar 8', rarity: 'epic' },
-  { emoji: '⚡', name: 'Speed Demon', description: 'Avg under 6s/Q', earned: true, earnedDate: 'Feb 28', rarity: 'rare' },
-  { emoji: '👑', name: 'League King', description: 'Reach Gold tier', earned: true, earnedDate: 'Mar 1', rarity: 'legendary' },
-  { emoji: '🎯', name: 'Sharpshooter', description: '90%+ accuracy x5', earned: true, earnedDate: 'Mar 15', rarity: 'epic' },
-  { emoji: '🌟', name: 'All-Rounder', description: 'Play all categories', earned: false, rarity: 'rare' },
-  { emoji: '💎', name: 'Diamond Mind', description: 'Reach Diamond tier', earned: false, rarity: 'legendary' },
-  { emoji: '🏆', name: 'Champion', description: 'Rank #1 in a week', earned: false, rarity: 'legendary' },
-  { emoji: '📚', name: 'Scholar', description: 'Unlock 50 explanations', earned: false, rarity: 'common' },
-];
+import { useUserProfile, useUserStats, useUserBadges, useUserMastery, useCreditBalance, useCreditHistory, useRedeemCredits } from '../hooks/useApi';
+import { toast, Toaster } from 'sonner';
 
 const TIER_COLORS = {
   Bronze: { bg: '#92400E', text: '#FDE68A', border: '#B45309' },
@@ -60,13 +18,64 @@ const TIER_COLORS = {
   Diamond: { bg: '#1E1B4B', text: '#C7D2FE', border: '#6366F1' },
 };
 
+const CREDITS_EARLY_DIGEST = 10;
+
 export default function Profile() {
   const navigate = useNavigate();
-  const tierColors = TIER_COLORS[PLAYER.leagueTier];
+  const { data: userProfile, isLoading: profileLoading } = useUserProfile();
+  const { data: userStats, isLoading: statsLoading } = useUserStats(userProfile?.id);
+  const { data: userBadges, isLoading: badgesLoading } = useUserBadges(userProfile?.id);
+  const { data: userMastery, isLoading: masteryLoading } = useUserMastery(userProfile?.id);
+  const { data: creditData } = useCreditBalance();
+  const { data: creditHistory } = useCreditHistory();
+  const redeemCredits = useRedeemCredits();
+
+  const [requestingDigest, setRequestingDigest] = useState(false);
+
+  if (profileLoading || statsLoading || badgesLoading || masteryLoading) {
+    return (
+      <div className="min-h-screen bg-[#0A0F1A] flex items-center justify-center">
+        <div className="text-center">
+          <div className="w-16 h-16 border-4 border-primary-500 border-t-transparent rounded-full animate-spin mx-auto mb-4" />
+          <p className="text-white font-semibold">Loading profile...</p>
+        </div>
+      </div>
+    );
+  }
+
+  const credits = creditData?.balance || 0;
+  const player = userProfile || {};
+  const stats = userStats || {};
+  const badges = userBadges?.badges || [];
+  const mastery = userMastery?.mastery || [];
+  const weeklyDigest = stats.weeklyDigest || null;
+  
+  const tierColors = TIER_COLORS[stats.leagueTier || 'Bronze'];
+
+  const handleRequestEarlyDigest = async () => {
+    if (credits < CREDITS_EARLY_DIGEST) {
+      toast.error(`Insufficient credits. Need ${CREDITS_EARLY_DIGEST} credits.`);
+      return;
+    }
+
+    setRequestingDigest(true);
+    try {
+      await redeemCredits.mutateAsync({
+        amount: CREDITS_EARLY_DIGEST,
+        purpose: 'early_digest',
+      });
+      toast.success('Early digest requested! Check back in a moment.');
+    } catch (error) {
+      toast.error(error.message || 'Failed to request early digest');
+    } finally {
+      setRequestingDigest(false);
+    }
+  };
 
   return (
     <div className="min-h-screen bg-[#0A0F1A] dot-pattern">
-      <Navbar credits={247} notificationCount={3} />
+      <Toaster position="top-center" theme="dark" />
+      <Navbar credits={credits} notificationCount={3} />
 
       <main className="max-w-3xl mx-auto px-4 md:px-6 pb-28 md:pb-10 pt-6 space-y-6">
 
@@ -81,34 +90,36 @@ export default function Profile() {
                 <div
                   className="w-20 h-20 rounded-2xl flex items-center justify-center text-4xl bg-[#1F2937] border-2 border-[#374151]"
                   style={{
-                    boxShadow: PLAYER.streak > 7 ? '0 0 0 3px #1D4ED8, 0 0 20px rgba(29,78,216,0.4)' : 'none',
+                    boxShadow: (stats.currentStreak || 0) > 7 ? '0 0 0 3px #1D4ED8, 0 0 20px rgba(29,78,216,0.4)' : 'none',
                   }}
                 >
-                  {PLAYER.avatar}
+                  {player.avatar || '🧠'}
                 </div>
-                {PLAYER.streak > 7 && (
+                {(stats.currentStreak || 0) > 7 && (
                   <div className="absolute -bottom-2 left-1/2 -translate-x-1/2 bg-[#1D4ED8] text-white text-[10px] font-bold px-2 py-0.5 rounded-full whitespace-nowrap">
-                    🔥 {PLAYER.streak} streak
+                    🔥 {stats.currentStreak} streak
                   </div>
                 )}
               </div>
 
               <div className="flex-1 text-center sm:text-left">
-                <h1 className="text-2xl font-black text-white">{PLAYER.name}</h1>
+                <h1 className="text-2xl font-black text-white">{player.displayName || player.username || 'Player'}</h1>
                 <div className="flex items-center justify-center sm:justify-start gap-2 mt-1">
                   <span className="text-xs font-mono text-[#6B7280] bg-[#1F2937] border border-[#374151] px-2 py-0.5 rounded-md">
-                    #{PLAYER.playerId}
+                    #{player.username || 'USER'}
                   </span>
-                  <span
-                    className="text-xs font-bold px-2 py-0.5 rounded-md border"
-                    style={{ background: tierColors.bg, color: tierColors.text, borderColor: tierColors.border }}
-                  >
-                    {PLAYER.leagueTier} League
-                  </span>
+                  {stats.leagueTier && (
+                    <span
+                      className="text-xs font-bold px-2 py-0.5 rounded-md border"
+                      style={{ background: tierColors.bg, color: tierColors.text, borderColor: tierColors.border }}
+                    >
+                      {stats.leagueTier} League
+                    </span>
+                  )}
                 </div>
                 <p className="text-sm text-[#9CA3AF] mt-2">
-                  Rank <span className="text-white font-bold">#{PLAYER.weeklyRank}</span> this week ·{' '}
-                  <span className="text-[#60A5FA] font-bold">{PLAYER.weeklyScore.toLocaleString()} pts</span>
+                  Rank <span className="text-white font-bold">#{stats.weeklyRank || 'N/A'}</span> this week ·{' '}
+                  <span className="text-[#60A5FA] font-bold">{(stats.weeklyScore || 0).toLocaleString()} pts</span>
                 </p>
               </div>
 
@@ -129,10 +140,10 @@ export default function Profile() {
           className="grid grid-cols-2 sm:grid-cols-4 gap-3"
         >
           {[
-            { label: 'Total Rounds', value: PLAYER.totalRounds, color: 'blue', icon: <Trophy size={16} /> },
-            { label: 'Accuracy', value: `${PLAYER.accuracy}%`, color: 'green', icon: <Target size={16} /> },
-            { label: 'Best Streak', value: PLAYER.bestStreak, color: 'yellow', icon: <Zap size={16} /> },
-            { label: 'Credits Spent', value: PLAYER.creditsSpent.toLocaleString(), color: 'purple', icon: <Star size={16} /> },
+            { label: 'Total Rounds', value: stats.totalRounds || 0, color: 'blue', icon: <Trophy size={16} /> },
+            { label: 'Accuracy', value: `${stats.accuracy || 0}%`, color: 'green', icon: <Target size={16} /> },
+            { label: 'Best Streak', value: stats.bestStreak || 0, color: 'yellow', icon: <Zap size={16} /> },
+            { label: 'Credits Spent', value: (stats.creditsSpent || 0).toLocaleString(), color: 'purple', icon: <Star size={16} /> },
           ].map((stat) => (
             <StatChip
               key={`stat-${stat.label}`}
@@ -145,55 +156,97 @@ export default function Profile() {
           ))}
         </motion.div>
 
-        <motion.div
-          initial={{ opacity: 0, y: 16 }}
-          animate={{ opacity: 1, y: 0 }}
-          transition={{ duration: 0.4, delay: 0.15 }}
-        >
-          <Card variant="default" padding="md">
-            <div className="flex items-center gap-2 mb-4">
-              <div className="w-7 h-7 rounded-lg bg-[#1E3A5F] flex items-center justify-center">
-                <Brain size={14} className="text-[#60A5FA]" />
+        {weeklyDigest && (
+          <motion.div
+            initial={{ opacity: 0, y: 16 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ duration: 0.4, delay: 0.15 }}
+          >
+            <Card variant="default" padding="md">
+              <div className="flex items-center gap-2 mb-4">
+                <div className="w-7 h-7 rounded-lg bg-[#1E3A5F] flex items-center justify-center">
+                  <Brain size={14} className="text-[#60A5FA]" />
+                </div>
+                <h2 className="text-sm font-bold text-white uppercase tracking-wider">Weekly AI Digest</h2>
+                <span className="ml-auto text-[10px] font-mono text-[#6B7280] bg-[#1F2937] px-2 py-0.5 rounded-full border border-[#374151]">
+                  Week {weeklyDigest.weekNumber || 'N/A'}
+                </span>
               </div>
-              <h2 className="text-sm font-bold text-white uppercase tracking-wider">Weekly AI Digest</h2>
-              <span className="ml-auto text-[10px] font-mono text-[#6B7280] bg-[#1F2937] px-2 py-0.5 rounded-full border border-[#374151]">
-                Week 12
-              </span>
-            </div>
 
-            <p className="text-sm text-[#9CA3AF] leading-relaxed mb-4">{WEEKLY_DIGEST.summary}</p>
+              <p className="text-sm text-[#9CA3AF] leading-relaxed mb-4">{weeklyDigest.summary}</p>
 
-            <div className="grid sm:grid-cols-2 gap-3">
-              <div className="bg-[#14532D] border border-[#16A34A] rounded-lg p-3">
-                <p className="text-xs font-bold text-[#4ADE80] mb-2 uppercase tracking-wider">💪 Strengths</p>
-                <ul className="space-y-1">
-                  {WEEKLY_DIGEST.strengths.map((s) => (
-                    <li key={`strength-${s}`} className="text-xs text-[#86EFAC] flex items-center gap-1.5">
-                      <span className="w-1 h-1 rounded-full bg-[#4ADE80] shrink-0" />
-                      {s}
-                    </li>
-                  ))}
-                </ul>
+              <div className="grid sm:grid-cols-2 gap-3">
+                {weeklyDigest.strengths && weeklyDigest.strengths.length > 0 && (
+                  <div className="bg-[#14532D] border border-[#16A34A] rounded-lg p-3">
+                    <p className="text-xs font-bold text-[#4ADE80] mb-2 uppercase tracking-wider">💪 Strengths</p>
+                    <ul className="space-y-1">
+                      {weeklyDigest.strengths.map((s, idx) => (
+                        <li key={`strength-${idx}`} className="text-xs text-[#86EFAC] flex items-center gap-1.5">
+                          <span className="w-1 h-1 rounded-full bg-[#4ADE80] shrink-0" />
+                          {s}
+                        </li>
+                      ))}
+                    </ul>
+                  </div>
+                )}
+                {weeklyDigest.suggestions && weeklyDigest.suggestions.length > 0 && (
+                  <div className="bg-[#1E3A5F] border border-[#1D4ED8] rounded-lg p-3">
+                    <p className="text-xs font-bold text-[#60A5FA] mb-2 uppercase tracking-wider">📌 Suggestions</p>
+                    <ul className="space-y-1">
+                      {weeklyDigest.suggestions.map((s, idx) => (
+                        <li key={`suggestion-${idx}`} className="text-xs text-[#93C5FD] flex items-center gap-1.5">
+                          <span className="w-1 h-1 rounded-full bg-[#60A5FA] shrink-0" />
+                          {s}
+                        </li>
+                      ))}
+                    </ul>
+                  </div>
+                )}
               </div>
-              <div className="bg-[#1E3A5F] border border-[#1D4ED8] rounded-lg p-3">
-                <p className="text-xs font-bold text-[#60A5FA] mb-2 uppercase tracking-wider">📌 Suggestions</p>
-                <ul className="space-y-1">
-                  {WEEKLY_DIGEST.suggestions.map((s) => (
-                    <li key={`suggestion-${s}`} className="text-xs text-[#93C5FD] flex items-center gap-1.5">
-                      <span className="w-1 h-1 rounded-full bg-[#60A5FA] shrink-0" />
-                      {s}
-                    </li>
-                  ))}
-                </ul>
-              </div>
-            </div>
 
-            <div className="mt-3 bg-[#1F2937] border border-[#374151] rounded-lg p-3">
-              <p className="text-xs font-bold text-[#FCD34D] mb-1">⚡ Fun Fact</p>
-              <p className="text-xs text-[#9CA3AF]">{WEEKLY_DIGEST.funFact}</p>
-            </div>
-          </Card>
-        </motion.div>
+              {weeklyDigest.funFact && (
+                <div className="mt-3 bg-[#1F2937] border border-[#374151] rounded-lg p-3">
+                  <p className="text-xs font-bold text-[#FCD34D] mb-1">⚡ Fun Fact</p>
+                  <p className="text-xs text-[#9CA3AF]">{weeklyDigest.funFact}</p>
+                </div>
+              )}
+            </Card>
+          </motion.div>
+        )}
+
+        {!weeklyDigest && (
+          <motion.div
+            initial={{ opacity: 0, y: 16 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ duration: 0.4, delay: 0.15 }}
+          >
+            <Card variant="default" padding="md">
+              <div className="flex items-center justify-between mb-3">
+                <div className="flex items-center gap-2">
+                  <div className="w-7 h-7 rounded-lg bg-[#1E3A5F] flex items-center justify-center">
+                    <Brain size={14} className="text-[#60A5FA]" />
+                  </div>
+                  <h2 className="text-sm font-bold text-white uppercase tracking-wider">Weekly AI Digest</h2>
+                </div>
+              </div>
+              <p className="text-sm text-[#6B7280] mb-3">No digest available yet. Play more to get your personalized insights!</p>
+              <button
+                onClick={handleRequestEarlyDigest}
+                disabled={requestingDigest || credits < CREDITS_EARLY_DIGEST}
+                className="w-full py-2 px-4 rounded-lg bg-[#1D4ED8] text-white text-sm font-semibold hover:bg-[#1E40AF] transition-colors disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2"
+              >
+                {requestingDigest ? (
+                  <>Requesting...</>
+                ) : (
+                  <>
+                    Request Early Digest
+                    <span className="text-xs opacity-75">({CREDITS_EARLY_DIGEST} 🪙)</span>
+                  </>
+                )}
+              </button>
+            </Card>
+          </motion.div>
+        )}
 
         <motion.div
           initial={{ opacity: 0, y: 16 }}
@@ -210,9 +263,9 @@ export default function Profile() {
             </button>
           </div>
           <div className="grid sm:grid-cols-2 gap-3">
-            {CATEGORY_MASTERY.map((cat, i) => (
+            {mastery.slice(0, 8).map((cat, i) => (
               <motion.div
-                key={`mastery-${cat.name}`}
+                key={`mastery-${cat.categoryId}`}
                 initial={{ opacity: 0, x: -10 }}
                 animate={{ opacity: 1, x: 0 }}
                 transition={{ delay: 0.2 + i * 0.04 }}
@@ -220,27 +273,27 @@ export default function Profile() {
               >
                 <div className="flex items-center justify-between mb-2">
                   <div className="flex items-center gap-2">
-                    <span className="text-lg">{cat.emoji}</span>
-                    <span className="text-sm font-semibold text-[#E5E7EB]">{cat.name}</span>
+                    <span className="text-lg">{cat.emoji || '📚'}</span>
+                    <span className="text-sm font-semibold text-[#E5E7EB]">{cat.categoryName}</span>
                   </div>
                   <span
                     className="text-[10px] font-bold px-2 py-0.5 rounded-full"
                     style={{
-                      background: `${cat.color}22`,
-                      color: cat.color,
-                      border: `1px solid ${cat.color}44`,
+                      background: `${cat.color || '#1D4ED8'}22`,
+                      color: cat.color || '#1D4ED8',
+                      border: `1px solid ${cat.color || '#1D4ED8'}44`,
                     }}
                   >
-                    {cat.level}
+                    {cat.masteryLevel}
                   </span>
                 </div>
                 <div className="mastery-bar">
                   <div
                     className="mastery-bar-fill"
-                    style={{ width: `${cat.progress}%`, background: cat.color }}
+                    style={{ width: `${cat.progressPercentage}%`, background: cat.color || '#1D4ED8' }}
                   />
                 </div>
-                <p className="text-[10px] text-[#6B7280] mt-1 font-mono">{cat.progress}%</p>
+                <p className="text-[10px] text-[#6B7280] mt-1 font-mono">{cat.progressPercentage}%</p>
               </motion.div>
             ))}
           </div>
@@ -255,14 +308,14 @@ export default function Profile() {
             <h2 className="text-sm font-bold text-white uppercase tracking-wider">
               Badges
               <span className="ml-2 text-[#6B7280] font-mono text-xs">
-                {BADGES.filter((b) => b.earned).length}/{BADGES.length}
+                {badges.filter((b) => b.earned).length}/{badges.length}
               </span>
             </h2>
           </div>
           <div className="grid grid-cols-3 gap-3">
-            {BADGES.map((badge, i) => (
+            {badges.map((badge, i) => (
               <motion.div
-                key={`badge-${badge.name}`}
+                key={`badge-${badge.id}`}
                 initial={{ opacity: 0, scale: 0.9 }}
                 animate={{ opacity: 1, scale: 1 }}
                 transition={{ delay: 0.25 + i * 0.04 }}

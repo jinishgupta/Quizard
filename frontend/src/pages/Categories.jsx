@@ -1,113 +1,22 @@
-import React, { useState } from 'react';
+import { useState } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { useNavigate } from 'react-router-dom';
 import { Lock, Star, ChevronRight, Sparkles } from 'lucide-react';
 import Navbar from '../components/Navbar';
 import MobileBottomNav from '../components/MobileBottomNav';
 import Card from '../components/ui/Card';
+import { useCategories, useUserMastery, useCreditBalance } from '../hooks/useApi';
+import { useAuth } from '../contexts/AuthContext';
 
-const CATEGORIES = [
-  {
-    id: 'sci-tech',
-    name: 'Science & Tech',
-    emoji: '🔬',
-    description: 'Physics, chemistry, biology, and cutting-edge technology',
-    masteryLevel: 'Expert',
-    masteryProgress: 82,
-    masteryColor: '#1D4ED8',
-    premium: false,
-    questionsPlayed: 240,
-    featured: true,
-  },
-  {
-    id: 'space',
-    name: 'Space & Cosmos',
-    emoji: '🚀',
-    description: 'Astronomy, space exploration, and the universe',
-    masteryLevel: 'Expert',
-    masteryProgress: 78,
-    masteryColor: '#7C3AED',
-    premium: false,
-    questionsPlayed: 185,
-  },
-  {
-    id: 'code',
-    name: 'Code & Dev',
-    emoji: '💻',
-    description: 'Programming languages, algorithms, and software',
-    masteryLevel: 'Adept',
-    masteryProgress: 65,
-    masteryColor: '#0891B2',
-    premium: false,
-    questionsPlayed: 142,
-  },
-  {
-    id: 'history',
-    name: 'World History',
-    emoji: '🏛️',
-    description: 'Ancient civilizations to modern world events',
-    masteryLevel: 'Adept',
-    masteryProgress: 58,
-    masteryColor: '#D97706',
-    premium: false,
-    questionsPlayed: 98,
-  },
-  {
-    id: 'culture',
-    name: 'Pop Culture',
-    emoji: '🎬',
-    description: 'Movies, TV, celebrities, and viral moments',
-    masteryLevel: 'Novice',
-    masteryProgress: 42,
-    masteryColor: '#DC2626',
-    premium: false,
-    questionsPlayed: 67,
-  },
-  {
-    id: 'geo',
-    name: 'Geography',
-    emoji: '🌍',
-    description: 'Countries, capitals, landmarks, and maps',
-    masteryLevel: 'Novice',
-    masteryProgress: 35,
-    masteryColor: '#16A34A',
-    premium: false,
-    questionsPlayed: 54,
-  },
-  {
-    id: 'music',
-    name: 'Music & Arts',
-    emoji: '🎵',
-    description: 'Music theory, artists, genres, and art history',
-    masteryLevel: 'Beginner',
-    masteryProgress: 22,
-    masteryColor: '#9333EA',
-    premium: true,
-    questionsPlayed: 18,
-  },
-  {
-    id: 'sports',
-    name: 'Sports',
-    emoji: '⚽',
-    description: 'Football, basketball, Olympics, and sports trivia',
-    masteryLevel: 'Beginner',
-    masteryProgress: 18,
-    masteryColor: '#EA580C',
-    premium: true,
-    questionsPlayed: 12,
-  },
-  {
-    id: 'custom',
-    name: 'Custom Quiz',
-    emoji: '✨',
-    description: 'AI-generated quiz on any topic you choose',
-    masteryLevel: '—',
-    masteryProgress: 0,
-    masteryColor: '#1D4ED8',
-    premium: true,
-    questionsPlayed: 0,
-  },
-];
+const MASTERY_COLORS = {
+  Legend: '#f97316',
+  Master: '#8b5cf6',
+  Expert: '#3b82f6',
+  Advanced: '#22c55e',
+  Intermediate: '#f59e0b',
+  Beginner: '#ec4899',
+  Novice: '#6b7280',
+};
 
 const DIFFICULTIES = ['Easy', 'Medium', 'Hard'];
 
@@ -119,11 +28,65 @@ const DIFFICULTY_CONFIG = {
 
 export default function Categories() {
   const navigate = useNavigate();
+  const { user } = useAuth();
   const [selectedCategory, setSelectedCategory] = useState(null);
   const [selectedDifficulty, setSelectedDifficulty] = useState('Medium');
 
-  const featuredCategory = CATEGORIES.find((c) => c.featured);
-  const otherCategories = CATEGORIES.filter((c) => !c.featured);
+  const { data: categoriesData, isLoading: categoriesLoading } = useCategories();
+  const { data: masteryData, isLoading: masteryLoading } = useUserMastery(user?.id);
+  const { data: creditData, isLoading: creditsLoading } = useCreditBalance();
+
+  const credits = creditData?.balance || 0;
+
+  // Build mastery map
+  const masteryMap = {};
+  if (masteryData?.mastery) {
+    masteryData.mastery.forEach(m => {
+      masteryMap[m.categoryId] = m;
+    });
+  }
+
+  // Transform backend categories to UI format
+  const categories = (categoriesData?.categories || []).map(cat => {
+    const mastery = masteryMap[cat.id];
+    return {
+      id: cat.id,
+      name: cat.name,
+      emoji: cat.emoji,
+      description: cat.description,
+      masteryLevel: mastery?.masteryLevel || 'Beginner',
+      masteryProgress: mastery?.progressPercentage || 0,
+      masteryColor: MASTERY_COLORS[mastery?.masteryLevel] || '#6b7280',
+      premium: false,
+      questionsPlayed: mastery?.totalQuestions || 0,
+      featured: false,
+    };
+  });
+
+  // Add custom quiz option
+  const allCategories = [
+    ...categories,
+    {
+      id: 'custom',
+      name: 'Custom Quiz',
+      emoji: '✨',
+      description: 'AI-generated quiz on any topic you choose',
+      masteryLevel: '—',
+      masteryProgress: 0,
+      masteryColor: '#1D4ED8',
+      premium: true,
+      questionsPlayed: 0,
+      featured: false,
+    },
+  ];
+
+  // Mark first category as featured if available
+  if (allCategories.length > 0 && allCategories[0].id !== 'custom') {
+    allCategories[0].featured = true;
+  }
+
+  const featuredCategory = allCategories.find((c) => c.featured);
+  const otherCategories = allCategories.filter((c) => !c.featured);
 
   const handleCategoryClick = (cat) => {
     if (cat.premium) return;
@@ -132,12 +95,38 @@ export default function Categories() {
 
   const handlePlay = () => {
     if (!selectedCategory) return;
-    navigate('/play-screen');
+    navigate('/play-screen', {
+      state: {
+        categoryId: selectedCategory.id,
+        categoryName: selectedCategory.name,
+        difficulty: selectedDifficulty.toLowerCase(),
+      },
+    });
   };
+
+  if (categoriesLoading || masteryLoading || creditsLoading) {
+    return (
+      <div className="min-h-screen bg-[#0A0F1A] dot-pattern">
+        <Navbar credits={0} notificationCount={3} />
+        <main className="max-w-4xl mx-auto px-4 md:px-6 pb-28 md:pb-10 pt-6">
+          <div className="animate-pulse space-y-6">
+            <div className="h-8 bg-gray-800 rounded w-1/3" />
+            <div className="h-32 bg-gray-800 rounded" />
+            <div className="grid grid-cols-2 md:grid-cols-3 gap-3">
+              {[...Array(6)].map((_, i) => (
+                <div key={i} className="h-32 bg-gray-800 rounded" />
+              ))}
+            </div>
+          </div>
+        </main>
+        <MobileBottomNav active="nav-cats" />
+      </div>
+    );
+  }
 
   return (
     <div className="min-h-screen bg-[#0A0F1A] dot-pattern">
-      <Navbar credits={247} notificationCount={3} />
+      <Navbar credits={credits} notificationCount={3} />
 
       <main className="max-w-4xl mx-auto px-4 md:px-6 pb-28 md:pb-10 pt-6 space-y-6">
 

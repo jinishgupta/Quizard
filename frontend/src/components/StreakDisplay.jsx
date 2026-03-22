@@ -6,7 +6,7 @@ const DAY_LABELS = ['M', 'T', 'W', 'T', 'F', 'S', 'S'];
 export default function StreakDisplay({ streakCount, weekHistory, compact = false }) {
   return (
     <div
-      className={`flex items-center ${compact ? 'gap-2' : 'gap-4'} px-4 py-3 rounded-card`}
+      className={`flex items-center ${compact ? 'gap-2' : 'gap-4'} px-4 py-3 rounded-2xl`}
       style={{
         background: 'linear-gradient(135deg, rgba(249,115,22,0.12), rgba(234,88,12,0.08))',
         border: '1px solid rgba(249,115,22,0.2)',

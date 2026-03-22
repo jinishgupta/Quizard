@@ -29,6 +29,7 @@ const migrations = [
   '001_initial_schema.sql',
   '002_seed_data.sql',
   '003_helper_functions.sql',
+  '004_add_admin_role.sql',
 ];
 
 async function runMigration(filename) {

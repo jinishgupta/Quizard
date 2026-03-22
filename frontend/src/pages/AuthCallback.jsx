@@ -1,12 +1,14 @@
-import React, { useEffect, useState } from 'react';
+import { useEffect, useState } from 'react';
 import { useNavigate, useSearchParams } from 'react-router-dom';
 import { useAuth } from '../contexts/AuthContext';
+import { useBedrockPassport } from '@bedrock_org/passport';
 import { motion } from 'framer-motion';
 
 const AuthCallback = () => {
   const [searchParams] = useSearchParams();
   const navigate = useNavigate();
   const { login } = useAuth();
+  const { loginCallback } = useBedrockPassport();
   const [error, setError] = useState(null);
   const [status, setStatus] = useState('Authenticating...');
 
@@ -22,6 +24,20 @@ const AuthCallback = () => {
           setTimeout(() => navigate('/login'), 2000);
           return;
         }
+
+        setStatus('Processing Orange ID login...');
+
+        // Call Bedrock Passport loginCallback
+        const success = await loginCallback(token, refreshToken);
+
+        if (!success) {
+          throw new Error('Bedrock Passport login callback failed');
+        }
+
+        // Store passport-token state object (required by Bedrock Passport)
+        localStorage.setItem('passport-token', JSON.stringify({ 
+          state: { accessToken: token, refreshToken } 
+        }));
 
         setStatus('Verifying with backend...');
 
@@ -60,7 +76,7 @@ const AuthCallback = () => {
     };
 
     handleCallback();
-  }, [searchParams, navigate, login]);
+  }, [searchParams, navigate, login, loginCallback]);
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-[#0A0F1A] via-[#1a1f2e] to-[#0A0F1A] flex items-center justify-center p-4">

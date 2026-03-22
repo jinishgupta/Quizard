@@ -1,22 +1,8 @@
-import React from 'react';
-import { useNavigate } from 'react-router-dom';
 import { motion } from 'framer-motion';
+import { LoginPanel } from '@bedrock_org/passport';
+import '@bedrock_org/passport/dist/style.css';
 
 const Login = () => {
-  const navigate = useNavigate();
-
-  const handleOrangeLogin = () => {
-    // Construct Orange ID login URL
-    const tenantId = import.meta.env.VITE_BEDROCK_TENANT_ID;
-    const callbackUrl = encodeURIComponent(import.meta.env.VITE_BEDROCK_AUTH_CALLBACK_URL);
-    const baseUrl = import.meta.env.VITE_BEDROCK_BASE_URL;
-    
-    const loginUrl = `${baseUrl}/auth/login?tenant_id=${tenantId}&redirect_uri=${callbackUrl}`;
-    
-    // Redirect to Orange ID login
-    window.location.href = loginUrl;
-  };
-
   return (
     <div className="min-h-screen bg-gradient-to-br from-[#0A0F1A] via-[#1a1f2e] to-[#0A0F1A] flex items-center justify-center p-4">
       <motion.div
@@ -25,63 +11,53 @@ const Login = () => {
         transition={{ duration: 0.5 }}
         className="max-w-md w-full"
       >
-        <div className="bg-[#1a1f2e] rounded-2xl shadow-2xl p-8 border border-gray-800">
-          {/* Logo/Title */}
-          <div className="text-center mb-8">
-            <motion.div
-              initial={{ scale: 0.8 }}
-              animate={{ scale: 1 }}
-              transition={{ duration: 0.5, delay: 0.2 }}
-              className="mb-4"
-            >
-              <div className="w-20 h-20 mx-auto bg-gradient-to-br from-orange-500 to-pink-500 rounded-full flex items-center justify-center">
-                <span className="text-4xl">🧠</span>
-              </div>
-            </motion.div>
-            <h1 className="text-3xl font-bold text-white mb-2">Trivia Platform</h1>
-            <p className="text-gray-400">Test your knowledge, compete with friends</p>
+        <LoginPanel
+          // Content options
+          title="Sign in to"
+          logo="https://irp.cdn-website.com/e81c109a/dms3rep/multi/orange-web3-logo-v2a-20241018.svg"
+          logoAlt="Orange Web3"
+          walletButtonText="Connect Wallet"
+          showConnectWallet={true}
+          separatorText="OR"
+
+          // Feature toggles
+          features={{
+            enableWalletConnect: true,
+            enableAppleLogin: true,
+            enableGoogleLogin: true,
+            enableEmailLogin: true,
+          }}
+
+          // Style options
+          titleClass="text-xl font-bold text-white"
+          logoClass="ml-2 md:h-8 h-6"
+          panelClass="container p-2 md:p-8 rounded-2xl max-w-[480px] bg-[#1a1f2e] border border-gray-800"
+          buttonClass="hover:border-orange-500"
+          separatorTextClass="bg-[#1a1f2e] text-gray-500"
+          separatorClass="bg-gray-800"
+          linkRowClass="justify-center"
+          headerClass="justify-center"
+        />
+
+        {/* Features */}
+        <div className="mt-8 space-y-3 bg-[#1a1f2e] rounded-2xl p-6 border border-gray-800">
+          <div className="flex items-center gap-3 text-gray-400">
+            <div className="w-8 h-8 bg-blue-500/20 rounded-lg flex items-center justify-center">
+              <span className="text-blue-400">🎯</span>
+            </div>
+            <span className="text-sm">Multiple quiz categories</span>
           </div>
-
-          {/* Login Button */}
-          <motion.button
-            whileHover={{ scale: 1.02 }}
-            whileTap={{ scale: 0.98 }}
-            onClick={handleOrangeLogin}
-            className="w-full bg-gradient-to-r from-orange-500 to-pink-500 text-white font-semibold py-4 px-6 rounded-xl shadow-lg hover:shadow-xl transition-all duration-200 flex items-center justify-center gap-3"
-          >
-            <svg className="w-6 h-6" fill="currentColor" viewBox="0 0 24 24">
-              <circle cx="12" cy="12" r="10" />
-            </svg>
-            <span>Login with Orange ID</span>
-          </motion.button>
-
-          {/* Info Text */}
-          <div className="mt-6 text-center">
-            <p className="text-sm text-gray-500">
-              Secure authentication powered by Bedrock Passport
-            </p>
+          <div className="flex items-center gap-3 text-gray-400">
+            <div className="w-8 h-8 bg-purple-500/20 rounded-lg flex items-center justify-center">
+              <span className="text-purple-400">🏆</span>
+            </div>
+            <span className="text-sm">Weekly league competitions</span>
           </div>
-
-          {/* Features */}
-          <div className="mt-8 space-y-3">
-            <div className="flex items-center gap-3 text-gray-400">
-              <div className="w-8 h-8 bg-blue-500/20 rounded-lg flex items-center justify-center">
-                <span className="text-blue-400">🎯</span>
-              </div>
-              <span className="text-sm">Multiple quiz categories</span>
+          <div className="flex items-center gap-3 text-gray-400">
+            <div className="w-8 h-8 bg-green-500/20 rounded-lg flex items-center justify-center">
+              <span className="text-green-400">⚡</span>
             </div>
-            <div className="flex items-center gap-3 text-gray-400">
-              <div className="w-8 h-8 bg-purple-500/20 rounded-lg flex items-center justify-center">
-                <span className="text-purple-400">🏆</span>
-              </div>
-              <span className="text-sm">Weekly league competitions</span>
-            </div>
-            <div className="flex items-center gap-3 text-gray-400">
-              <div className="w-8 h-8 bg-green-500/20 rounded-lg flex items-center justify-center">
-                <span className="text-green-400">⚡</span>
-              </div>
-              <span className="text-sm">Real-time challenges</span>
-            </div>
+            <span className="text-sm">Real-time challenges</span>
           </div>
         </div>
 

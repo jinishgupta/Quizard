@@ -1,4 +1,5 @@
-import React, { createContext, useContext, useState, useEffect } from 'react';
+import { createContext, useContext, useState, useEffect } from 'react';
+import { useBedrockPassport } from '@bedrock_org/passport';
 
 const AuthContext = createContext(null);
 
@@ -15,6 +16,7 @@ export const AuthProvider = ({ children }) => {
   const [token, setToken] = useState(null);
   const [refreshToken, setRefreshToken] = useState(null);
   const [loading, setLoading] = useState(true);
+  const { signOut } = useBedrockPassport();
 
   // Load user data from localStorage on mount
   useEffect(() => {
@@ -41,21 +43,31 @@ export const AuthProvider = ({ children }) => {
 
   const logout = async () => {
     try {
-      // Call logout endpoint
-      await fetch(`${import.meta.env.VITE_API_URL}/api/auth/logout`, {
-        method: 'POST',
-        headers: {
-          'Authorization': `Bearer ${token}`,
-          'Content-Type': 'application/json',
-        },
-      });
+      // Call backend logout endpoint
+      if (token) {
+        await fetch(`${import.meta.env.VITE_API_URL}/api/auth/logout`, {
+          method: 'POST',
+          headers: {
+            'Authorization': `Bearer ${token}`,
+            'Content-Type': 'application/json',
+          },
+        });
+      }
+
+      // Call Bedrock Passport signOut to clear SDK state
+      await signOut();
     } catch (error) {
       console.error('Logout error:', error);
     } finally {
-      // Clear local storage and state
+      // Clear all local storage
       localStorage.removeItem('orange_token');
       localStorage.removeItem('orange_refresh_token');
       localStorage.removeItem('user');
+      localStorage.removeItem('passport-token');
+      localStorage.removeItem('bedrock:accessToken');
+      localStorage.removeItem('bedrock:refreshToken');
+      
+      // Clear state
       setToken(null);
       setRefreshToken(null);
       setUser(null);

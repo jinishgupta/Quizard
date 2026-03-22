@@ -5,6 +5,9 @@ import { CheckCircle, XCircle, ChevronDown, ChevronUp, Share2, Trophy, RotateCcw
 import CreditBadge from './ui/CreditBadge';
 import { Toaster, toast } from 'sonner';
 import confetti from 'canvas-confetti';
+import { useUnlockExplanation, useCreditBalance } from '../hooks/useApi';
+
+const CREDITS_EXPLANATION_PACK = 15;
 
 
 // Mock fallback data if sessionStorage is empty
@@ -65,12 +68,17 @@ export default function ResultsClient() {
   const navigate = useNavigate();
   const [displayScore, setDisplayScore] = useState(0);
   const [expandedExplanations, setExpandedExplanations] = useState(new Set());
-  const [credits, setCredits] = useState(247);
-  const [purchasingExplanation, setPurchasingExplanation] = useState(null);
   const [unlockedExplanations, setUnlockedExplanations] = useState(new Set());
   const hasLaunched = useRef(false);
 
-  const data = FALLBACK_RESULTS;
+  const { data: creditData } = useCreditBalance();
+  const unlockExplanation = useUnlockExplanation();
+
+  const credits = creditData?.balance || 0;
+
+  // Try to get results from sessionStorage, fallback to mock data
+  const storedResults = sessionStorage.getItem('triviaResults');
+  const data = storedResults ? JSON.parse(storedResults) : FALLBACK_RESULTS;
   const pct = Math.round((data.score / data.total) * 100);
   const accuracy = pct;
   const tier = getPerformanceTier(pct);
@@ -135,16 +143,23 @@ export default function ResultsClient() {
     });
   };
 
-  const purchaseExplanation = (questionId) => {
-    if (credits < 2) { toast.error('Not enough credits to unlock explanation!'); return; }
-    setPurchasingExplanation(questionId);
-    setTimeout(() => {
-      setCredits((c) => c - 2);
+  const purchaseExplanation = async (questionId) => {
+    if (credits < CREDITS_EXPLANATION_PACK) {
+      toast.error(`Insufficient credits. Need ${CREDITS_EXPLANATION_PACK} credits.`);
+      return;
+    }
+
+    try {
+      await unlockExplanation.mutateAsync({
+        sessionId: data.sessionId,
+        questionId,
+      });
       setUnlockedExplanations((prev) => new Set([...prev, questionId]));
       setExpandedExplanations((prev) => new Set([...prev, questionId]));
-      setPurchasingExplanation(null);
       toast.success('Explanation unlocked!');
-    }, 600);
+    } catch (error) {
+      toast.error(error.message || 'Failed to unlock explanation');
+    }
   };
 
   const leaguePointsEarned = Math.round((data.score / data.total) * 50 * (tier === 'legend' ? 1.5 : 1));
@@ -272,7 +287,7 @@ export default function ResultsClient() {
               const isCorrect = result?.correct ?? false;
               const isExpanded = expandedExplanations.has(q.id);
               const isUnlocked = isCorrect || unlockedExplanations.has(q.id);
-              const isPurchasing = purchasingExplanation === q.id;
+              const isPurchasing = unlockExplanation.isPending;
               const userAnswer = result?.selectedIndex !== null && result?.selectedIndex !== undefined
                 ? q.options[result.selectedIndex]?.text
                 : 'No answer (timed out)';
@@ -354,8 +369,8 @@ export default function ResultsClient() {
                       ) : (
                         <button
                           onClick={() => purchaseExplanation(q.id)}
-                          disabled={isPurchasing}
-                          className="flex items-center gap-1.5 text-xs font-semibold transition-all duration-150 hover:scale-105 active:scale-95 disabled:opacity-60"
+                          disabled={isPurchasing || credits < CREDITS_EXPLANATION_PACK}
+                          className="flex items-center gap-1.5 text-xs font-semibold transition-all duration-150 hover:scale-105 active:scale-95 disabled:opacity-60 disabled:cursor-not-allowed"
                           style={{ color: '#fb923c' }}
                         >
                           {isPurchasing ? (
@@ -363,12 +378,12 @@ export default function ResultsClient() {
                           ) : (
                             <ChevronDown size={14} />
                           )}
-                          View Explanation
+                          Unlock Explanation
                           <span
                             className="px-1.5 py-0.5 rounded text-xs font-mono"
                             style={{ background: 'rgba(249,115,22,0.15)', border: '1px solid rgba(249,115,22,0.25)' }}
                           >
-                            2 🪙
+                            {CREDITS_EXPLANATION_PACK} 🪙
                           </span>
                         </button>
                       )}

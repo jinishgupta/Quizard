@@ -1,120 +1,90 @@
 import React, { useState, useEffect, useCallback, useRef } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate, useLocation } from 'react-router-dom';
 import { motion, AnimatePresence } from 'framer-motion';
 import { X, CheckCircle, XCircle, Lightbulb, Eye, AlignLeft, ArrowRight, Home } from 'lucide-react';
 import CreditBadge from './CreditBadge';
 import { Toaster, toast } from 'sonner';
+import { useCreateSession, useSubmitAnswer, useCompleteSession, useHintEliminate, useHintClue, useHintFirstLetter, useCreditBalance } from '../hooks/useApi';
 
-const QUIZ_DATA = {
-  category: 'Tech & AI',
-  totalQuestions: 10,
-  questions: [
-    {
-      id: 'q-001',
-      text: 'Which architecture forms the backbone of most modern large language models, enabling parallel processing of sequential data through self-attention mechanisms?',
-      options: [
-        { id: 'q-001-a', label: 'A', text: 'Recurrent Neural Network (RNN)' },
-        { id: 'q-001-b', label: 'B', text: 'Transformer Architecture' },
-        { id: 'q-001-c', label: 'C', text: 'Convolutional Neural Network (CNN)' },
-        { id: 'q-001-d', label: 'D', text: 'Long Short-Term Memory (LSTM)' },
-      ],
-      correctIndex: 1,
-      explanation: 'The Transformer architecture, introduced in "Attention Is All You Need" (2017), revolutionized NLP by replacing sequential processing with parallel self-attention mechanisms, enabling models like GPT and BERT.',
-      firstLetter: 'T',
-      timeLimit: 30,
-    },
-    {
-      id: 'q-002',
-      text: 'What does "hallucination" mean in the context of large language models?',
-      options: [
-        { id: 'q-002-a', label: 'A', text: 'The model generating images from text' },
-        { id: 'q-002-b', label: 'B', text: 'Confidently producing false or fabricated information' },
-        { id: 'q-002-c', label: 'C', text: 'A visual artifact in image generation' },
-        { id: 'q-002-d', label: 'D', text: 'The model entering an infinite loop' },
-      ],
-      correctIndex: 1,
-      explanation: 'LLM hallucination refers to the model generating plausible-sounding but factually incorrect or entirely fabricated information, often with high confidence — a critical challenge in AI safety.',
-      firstLetter: 'C',
-      timeLimit: 25,
-    },
-    {
-      id: 'q-003',
-      text: 'Which company developed the AlphaGo program that defeated world champion Go player Lee Sedol in 2016?',
-      options: [
-        { id: 'q-003-a', label: 'A', text: 'OpenAI' },
-        { id: 'q-003-b', label: 'B', text: 'Meta AI Research' },
-        { id: 'q-003-c', label: 'C', text: 'DeepMind' },
-        { id: 'q-003-d', label: 'D', text: 'IBM Research' },
-      ],
-      correctIndex: 2,
-      explanation: 'DeepMind, a Google subsidiary, developed AlphaGo. Its victory over Lee Sedol in a best-of-five series (4-1) was a landmark moment in AI history, demonstrating mastery of a game long thought beyond machine capability.',
-      firstLetter: 'D',
-      timeLimit: 20,
-    },
-    {
-      id: 'q-004',
-      text: 'In machine learning, what is "overfitting"?',
-      options: [
-        { id: 'q-004-a', label: 'A', text: 'Using too many training epochs' },
-        { id: 'q-004-b', label: 'B', text: 'When a model performs well on training data but poorly on new data' },
-        { id: 'q-004-c', label: 'C', text: 'A model with too few parameters' },
-        { id: 'q-004-d', label: 'D', text: 'Training on imbalanced datasets' },
-      ],
-      correctIndex: 1,
-      explanation: 'Overfitting occurs when a model memorizes training data — including its noise — rather than learning generalizable patterns, causing poor performance on unseen data. Regularization, dropout, and cross-validation help prevent it.',
-      firstLetter: 'W',
-      timeLimit: 22,
-    },
-    {
-      id: 'q-005',
-      text: 'What does "RAG" stand for in the context of modern AI systems?',
-      options: [
-        { id: 'q-005-a', label: 'A', text: 'Rapid Algorithmic Generation' },
-        { id: 'q-005-b', label: 'B', text: 'Retrieval-Augmented Generation' },
-        { id: 'q-005-c', label: 'C', text: 'Recursive Attention Gradient' },
-        { id: 'q-005-d', label: 'D', text: 'Real-time Adaptive Grounding' },
-      ],
-      correctIndex: 1,
-      explanation: 'Retrieval-Augmented Generation (RAG) combines a language model with an external knowledge retrieval system, allowing the model to fetch relevant documents before generating a response — reducing hallucinations and enabling up-to-date answers.',
-      firstLetter: 'R',
-      timeLimit: 28,
-    },
-  ],
-};
+const CREDITS_HINT_ELIMINATE = 6;
+const CREDITS_HINT_CLUE = 6;
+const CREDITS_HINT_FIRST_LETTER = 6;
 
 export default function PlayScreenClient() {
   const navigate = useNavigate();
+  const location = useLocation();
+  const { categoryId, categoryName } = location.state || {};
+  
+  const [session, setSession] = useState(null);
   const [currentQ, setCurrentQ] = useState(0);
   const [selectedAnswer, setSelectedAnswer] = useState(null);
   const [answerState, setAnswerState] = useState('unanswered');
-  const [timeLeft, setTimeLeft] = useState(QUIZ_DATA.questions[0].timeLimit);
-  const [credits, setCredits] = useState(247);
+  const [timeLeft, setTimeLeft] = useState(30);
   const [results, setResults] = useState([]);
   const [eliminatedOptions, setEliminatedOptions] = useState([]);
-  const [clueShown, setClueShown] = useState(false);
-  const [firstLetterShown, setFirstLetterShown] = useState(false);
+  const [clueText, setClueText] = useState(null);
+  const [firstLetter, setFirstLetter] = useState(null);
   const [isTransitioning, setIsTransitioning] = useState(false);
   const timerRef = useRef(null);
   const startTimeRef = useRef(Date.now());
 
-  const question = QUIZ_DATA.questions[Math.min(currentQ, QUIZ_DATA.questions.length - 1)];
-  const progress = ((currentQ) / QUIZ_DATA.totalQuestions) * 100;
+  const { data: creditData } = useCreditBalance();
+  const createSession = useCreateSession();
+  const submitAnswer = useSubmitAnswer();
+  const completeSession = useCompleteSession();
+  const hintEliminate = useHintEliminate();
+  const hintClue = useHintClue();
+  const hintFirstLetter = useHintFirstLetter();
+
+  const credits = creditData?.balance || 0;
+
+  // Create session on mount
+  useEffect(() => {
+    if (!categoryId) {
+      toast.error('Please select a category');
+      navigate('/home-dashboard');
+      return;
+    }
+
+    createSession.mutate(
+      { categoryId, difficulty: 'medium' },
+      {
+        onSuccess: (data) => {
+          setSession(data.session);
+          setTimeLeft(data.session.questions[0]?.timeLimit || 30);
+        },
+        onError: (error) => {
+          toast.error(error.message || 'Failed to create session');
+          navigate('/home-dashboard');
+        },
+      }
+    );
+  }, [categoryId]);
+
+  const question = session?.questions?.[currentQ];
+  const progress = session ? ((currentQ) / session.totalQuestions) * 100 : 0;
   const isAnswered = answerState !== 'unanswered';
-  const timerPercent = (timeLeft / question.timeLimit) * 100;
+  const timerPercent = question ? (timeLeft / question.timeLimit) * 100 : 0;
   const timerColor = timeLeft <= 5 ? '#ef4444' : timeLeft <= 10 ? '#f59e0b' : '#f97316';
 
   const handleTimeUp = useCallback(() => {
-    if (answerState === 'unanswered') {
+    if (answerState === 'unanswered' && question) {
       setAnswerState('wrong');
+      submitAnswer.mutate({
+        sessionId: session.id,
+        questionIndex: currentQ,
+        answer: null,
+        timeSpent: question.timeLimit,
+      });
       setResults((prev) => [
         ...prev,
-        { questionId: question.id, selectedIndex: null, correct: false, timeSpent: question.timeLimit },
+        { questionIndex: currentQ, selectedIndex: null, correct: false, timeSpent: question.timeLimit },
       ]);
     }
-  }, [answerState, question.id, question.timeLimit]);
+  }, [answerState, question, session, currentQ]);
 
   useEffect(() => {
-    if (isAnswered) return;
+    if (isAnswered || !question) return;
     timerRef.current = setInterval(() => {
       setTimeLeft((t) => {
         if (t <= 1) {
@@ -126,35 +96,47 @@ export default function PlayScreenClient() {
       });
     }, 1000);
     return () => clearInterval(timerRef.current);
-  }, [currentQ, isAnswered, handleTimeUp]);
+  }, [currentQ, isAnswered, handleTimeUp, question]);
 
   const handleAnswer = (index) => {
-    if (isAnswered) return;
+    if (isAnswered || !question) return;
     clearInterval(timerRef.current);
     const timeSpent = question.timeLimit - timeLeft;
-    const correct = index === question.correctIndex;
+    const selectedAnswerText = question.options[index];
+    const correct = selectedAnswerText === question.correctAnswer;
+    
     setSelectedAnswer(index);
     setAnswerState(correct ? 'correct' : 'wrong');
-    setResults((prev) => [...prev, { questionId: question.id, selectedIndex: index, correct, timeSpent }]);
+    
+    submitAnswer.mutate({
+      sessionId: session.id,
+      questionIndex: currentQ,
+      answer: selectedAnswerText,
+      timeSpent,
+    });
+    
+    setResults((prev) => [...prev, { questionIndex: currentQ, selectedIndex: index, correct, timeSpent }]);
   };
 
   const handleNext = () => {
-    if (isTransitioning) return;
+    if (isTransitioning || !session) return;
     setIsTransitioning(true);
 
     const nextQ = currentQ + 1;
-    if (nextQ >= QUIZ_DATA.questions.length) {
-      const correctCount = results.filter((r) => r.correct).length + (answerState === 'correct' ? 1 : 0);
-      const totalTime = results.reduce((acc, r) => acc + r.timeSpent, 0);
-      sessionStorage.setItem('triviaResults', JSON.stringify({
-        score: correctCount,
-        total: QUIZ_DATA.questions.length,
-        totalTime,
-        category: QUIZ_DATA.category,
-        results: [...results, { questionId: question.id, selectedIndex: selectedAnswer, correct: answerState === 'correct', timeSpent: question.timeLimit - timeLeft }],
-        questions: QUIZ_DATA.questions,
-      }));
-      navigate('/results-screen');
+    if (nextQ >= session.totalQuestions) {
+      completeSession.mutate(session.id, {
+        onSuccess: (data) => {
+          sessionStorage.setItem('triviaResults', JSON.stringify({
+            ...data,
+            category: categoryName,
+          }));
+          navigate('/results-screen');
+        },
+        onError: (error) => {
+          toast.error(error.message || 'Failed to complete session');
+          navigate('/home-dashboard');
+        },
+      });
       return;
     }
 
@@ -162,54 +144,115 @@ export default function PlayScreenClient() {
       setCurrentQ(nextQ);
       setSelectedAnswer(null);
       setAnswerState('unanswered');
-      setTimeLeft(QUIZ_DATA.questions[nextQ].timeLimit);
+      setTimeLeft(session.questions[nextQ]?.timeLimit || 30);
       setEliminatedOptions([]);
-      setClueShown(false);
-      setFirstLetterShown(false);
+      setClueText(null);
+      setFirstLetter(null);
       setIsTransitioning(false);
       startTimeRef.current = Date.now();
     }, 300);
   };
 
   const handleEliminate = () => {
-    if (credits < 3) { toast.error('Not enough credits!'); return; }
-    if (eliminatedOptions.length > 0) { toast.info('Already used on this question'); return; }
-    const wrongIndices = question.options
-      .map((_, i) => i)
-      .filter((i) => i !== question.correctIndex && selectedAnswer !== i);
-    const toEliminate = wrongIndices.slice(0, 2);
-    setEliminatedOptions(toEliminate);
-    setCredits((c) => c - 3);
-    toast.success('2 wrong answers eliminated!');
+    if (!question || !session) return;
+    if (eliminatedOptions.length > 0) {
+      toast.info('Already used on this question');
+      return;
+    }
+    if (credits < CREDITS_HINT_ELIMINATE) {
+      toast.error(`Insufficient credits. Need ${CREDITS_HINT_ELIMINATE} credits.`);
+      return;
+    }
+
+    hintEliminate.mutate(
+      { sessionId: session.id, questionIndex: currentQ },
+      {
+        onSuccess: (data) => {
+          setEliminatedOptions(data.eliminatedIndices || []);
+          toast.success('2 wrong answers eliminated!');
+        },
+        onError: (error) => {
+          toast.error(error.message || 'Failed to eliminate options');
+        },
+      }
+    );
   };
 
   const handleClue = () => {
-    if (credits < 3) { toast.error('Not enough credits!'); return; }
-    if (clueShown) { toast.info('Clue already revealed'); return; }
-    setClueShown(true);
-    setCredits((c) => c - 3);
-    toast.success('Clue revealed!');
+    if (!question || !session) return;
+    if (clueText) {
+      toast.info('Clue already revealed');
+      return;
+    }
+    if (credits < CREDITS_HINT_CLUE) {
+      toast.error(`Insufficient credits. Need ${CREDITS_HINT_CLUE} credits.`);
+      return;
+    }
+
+    hintClue.mutate(
+      { sessionId: session.id, questionIndex: currentQ },
+      {
+        onSuccess: (data) => {
+          setClueText(data.clue);
+          toast.success('Clue revealed!');
+        },
+        onError: (error) => {
+          toast.error(error.message || 'Failed to get clue');
+        },
+      }
+    );
   };
 
-  const handleFirstLetter = () => {
-    if (credits < 2) { toast.error('Not enough credits!'); return; }
-    if (firstLetterShown) { toast.info('Already revealed'); return; }
-    setFirstLetterShown(true);
-    setCredits((c) => c - 2);
-    toast.success(`First letter: "${question.firstLetter}"`);
+  const handleFirstLetterReveal = () => {
+    if (!question || !session) return;
+    if (firstLetter) {
+      toast.info('Already revealed');
+      return;
+    }
+    if (credits < CREDITS_HINT_FIRST_LETTER) {
+      toast.error(`Insufficient credits. Need ${CREDITS_HINT_FIRST_LETTER} credits.`);
+      return;
+    }
+
+    hintFirstLetter.mutate(
+      { sessionId: session.id, questionIndex: currentQ },
+      {
+        onSuccess: (data) => {
+          setFirstLetter(data.firstLetter);
+          toast.success(`First letter: "${data.firstLetter}"`);
+        },
+        onError: (error) => {
+          toast.error(error.message || 'Failed to reveal first letter');
+        },
+      }
+    );
   };
 
   const getOptionClass = (index) => {
+    if (!question) return 'answer-btn';
     if (eliminatedOptions.includes(index)) return 'answer-btn dimmed';
     if (!isAnswered) return 'answer-btn';
-    if (index === question.correctIndex) return 'answer-btn correct';
-    if (index === selectedAnswer && index !== question.correctIndex) return 'answer-btn wrong';
+    const correctIndex = question.options.indexOf(question.correctAnswer);
+    if (index === correctIndex) return 'answer-btn correct';
+    if (index === selectedAnswer && index !== correctIndex) return 'answer-btn wrong';
     return 'answer-btn dimmed';
   };
+
+  if (!session || !question) {
+    return (
+      <div className="min-h-screen flex items-center justify-center" style={{ background: 'linear-gradient(180deg, #0F0F0F 0%, #141414 100%)' }}>
+        <div className="text-center">
+          <div className="w-16 h-16 border-4 border-primary-500 border-t-transparent rounded-full animate-spin mx-auto mb-4" />
+          <p className="text-white font-semibold">Loading quiz...</p>
+        </div>
+      </div>
+    );
+  }
 
   const radius = 28;
   const circumference = 2 * Math.PI * radius;
   const strokeDashoffset = circumference - (timerPercent / 100) * circumference;
+  const correctIndex = question.options.indexOf(question.correctAnswer);
 
   return (
     <div
@@ -223,7 +266,7 @@ export default function PlayScreenClient() {
           className="h-full"
           style={{ background: 'linear-gradient(90deg, #ea580c, #f97316, #fb923c)' }}
           initial={{ width: `${progress}%` }}
-          animate={{ width: `${((currentQ) / QUIZ_DATA.totalQuestions) * 100}%` }}
+          animate={{ width: `${((currentQ) / session.totalQuestions) * 100}%` }}
           transition={{ duration: 0.4, ease: 'easeOut' }}
         />
       </div>
@@ -238,13 +281,13 @@ export default function PlayScreenClient() {
 
         <div className="flex items-center gap-3">
           <span className="text-sm font-bold text-gray-400 uppercase tracking-wider">
-            {QUIZ_DATA.category}
+            {categoryName}
           </span>
           <span
             className="text-sm font-black text-white px-3 py-1 rounded-full"
             style={{ background: 'rgba(249,115,22,0.15)', border: '1px solid rgba(249,115,22,0.3)' }}
           >
-            Q {currentQ + 1}/{QUIZ_DATA.totalQuestions}
+            Q {currentQ + 1}/{session.totalQuestions}
           </span>
         </div>
 
@@ -296,18 +339,18 @@ export default function PlayScreenClient() {
               </div>
             </div>
 
-            {clueShown && (
+            {clueText && (
               <motion.div
                 initial={{ opacity: 0, height: 0 }}
                 animate={{ opacity: 1, height: 'auto' }}
                 className="px-4 py-3 rounded-lg text-sm text-yellow-300 font-medium"
                 style={{ background: 'rgba(245,158,11,0.1)', border: '1px solid rgba(245,158,11,0.25)' }}
               >
-                💡 <span className="font-bold">Clue:</span> Focus on the architecture that introduced self-attention mechanisms in the seminal 2017 paper.
+                💡 <span className="font-bold">Clue:</span> {clueText}
               </motion.div>
             )}
 
-            {firstLetterShown && (
+            {firstLetter && (
               <motion.div
                 initial={{ opacity: 0, height: 0 }}
                 animate={{ opacity: 1, height: 'auto' }}
@@ -315,7 +358,7 @@ export default function PlayScreenClient() {
                 style={{ background: 'rgba(59,130,246,0.1)', border: '1px solid rgba(59,130,246,0.25)' }}
               >
                 🔤 <span className="font-bold">First letter of answer:</span>{' '}
-                <span className="text-2xl font-black font-mono">{question.firstLetter}</span>
+                <span className="text-2xl font-black font-mono">{firstLetter}</span>
               </motion.div>
             )}
 
@@ -328,14 +371,14 @@ export default function PlayScreenClient() {
               }}
             >
               <p className="text-xl md:text-2xl font-bold text-white leading-snug">
-                {question.text}
+                {question.question}
               </p>
             </div>
 
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
               {question.options.map((option, index) => (
                 <motion.button
-                  key={option.id}
+                  key={`option-${index}`}
                   onClick={() => handleAnswer(index)}
                   disabled={isAnswered || eliminatedOptions.includes(index)}
                   className={`${getOptionClass(index)} min-h-[56px] p-4 rounded-xl text-left flex items-center gap-3 w-full`}
@@ -355,27 +398,27 @@ export default function PlayScreenClient() {
                     className="w-8 h-8 rounded-lg flex items-center justify-center text-sm font-black shrink-0 transition-all duration-150"
                     style={{
                       background:
-                        isAnswered && index === question.correctIndex
+                        isAnswered && index === correctIndex
                           ? 'rgba(255,255,255,0.2)'
                           : isAnswered && index === selectedAnswer
                           ? 'rgba(255,255,255,0.15)'
                           : 'rgba(249,115,22,0.15)',
                       color:
-                        isAnswered && index === question.correctIndex
+                        isAnswered && index === correctIndex
                           ? '#fff'
                           : isAnswered && index === selectedAnswer
                           ? '#fff' :'#f97316',
                     }}
                   >
-                    {option.label}
+                    {String.fromCharCode(65 + index)}
                   </span>
                   <span className="text-sm md:text-base font-semibold text-white leading-snug">
-                    {option.text}
+                    {option}
                   </span>
-                  {isAnswered && index === question.correctIndex && (
+                  {isAnswered && index === correctIndex && (
                     <CheckCircle size={18} className="ml-auto text-green-300 shrink-0" />
                   )}
-                  {isAnswered && index === selectedAnswer && index !== question.correctIndex && (
+                  {isAnswered && index === selectedAnswer && index !== correctIndex && (
                     <XCircle size={18} className="ml-auto text-red-300 shrink-0" />
                   )}
                 </motion.button>
@@ -403,7 +446,7 @@ export default function PlayScreenClient() {
                     </p>
                     {answerState !== 'correct' && (
                       <p className="text-sm text-gray-300">
-                        Correct answer: <span className="font-bold text-white">{question.options[question.correctIndex].text}</span>
+                        Correct answer: <span className="font-bold text-white">{question.correctAnswer}</span>
                       </p>
                     )}
                   </div>
@@ -427,9 +470,9 @@ export default function PlayScreenClient() {
             <span className="text-xs text-gray-600 font-medium mr-1">Hints:</span>
             <button
               onClick={handleEliminate}
-              disabled={eliminatedOptions.length > 0}
+              disabled={eliminatedOptions.length > 0 || hintEliminate.isPending || credits < CREDITS_HINT_ELIMINATE}
               className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-bold transition-all duration-150 ${
-                eliminatedOptions.length > 0
+                eliminatedOptions.length > 0 || hintEliminate.isPending || credits < CREDITS_HINT_ELIMINATE
                   ? 'opacity-40 cursor-not-allowed' :'hover:scale-105 active:scale-95'
               }`}
               style={{
@@ -441,14 +484,14 @@ export default function PlayScreenClient() {
               <Eye size={12} />
               Eliminate 2 Wrong
               <span className="px-1.5 py-0.5 rounded text-xs font-mono" style={{ background: 'rgba(249,115,22,0.2)' }}>
-                3 🪙
+                {CREDITS_HINT_ELIMINATE} 🪙
               </span>
             </button>
             <button
               onClick={handleClue}
-              disabled={clueShown}
+              disabled={!!clueText || hintClue.isPending || credits < CREDITS_HINT_CLUE}
               className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-bold transition-all duration-150 ${
-                clueShown ? 'opacity-40 cursor-not-allowed' : 'hover:scale-105 active:scale-95'
+                clueText || hintClue.isPending || credits < CREDITS_HINT_CLUE ? 'opacity-40 cursor-not-allowed' : 'hover:scale-105 active:scale-95'
               }`}
               style={{
                 background: 'rgba(245,158,11,0.12)',
@@ -459,14 +502,14 @@ export default function PlayScreenClient() {
               <Lightbulb size={12} />
               Get a Clue
               <span className="px-1.5 py-0.5 rounded text-xs font-mono" style={{ background: 'rgba(245,158,11,0.2)' }}>
-                3 🪙
+                {CREDITS_HINT_CLUE} 🪙
               </span>
             </button>
             <button
-              onClick={handleFirstLetter}
-              disabled={firstLetterShown}
+              onClick={handleFirstLetterReveal}
+              disabled={!!firstLetter || hintFirstLetter.isPending || credits < CREDITS_HINT_FIRST_LETTER}
               className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-bold transition-all duration-150 ${
-                firstLetterShown ? 'opacity-40 cursor-not-allowed' : 'hover:scale-105 active:scale-95'
+                firstLetter || hintFirstLetter.isPending || credits < CREDITS_HINT_FIRST_LETTER ? 'opacity-40 cursor-not-allowed' : 'hover:scale-105 active:scale-95'
               }`}
               style={{
                 background: 'rgba(59,130,246,0.12)',
@@ -477,7 +520,7 @@ export default function PlayScreenClient() {
               <AlignLeft size={12} />
               First Letter
               <span className="px-1.5 py-0.5 rounded text-xs font-mono" style={{ background: 'rgba(59,130,246,0.2)' }}>
-                2 🪙
+                {CREDITS_HINT_FIRST_LETTER} 🪙
               </span>
             </button>
           </div>
@@ -493,14 +536,14 @@ export default function PlayScreenClient() {
             >
               <button
                 onClick={handleNext}
-                disabled={isTransitioning}
+                disabled={isTransitioning || completeSession.isPending}
                 className="flex items-center justify-center gap-2 w-full max-w-sm py-4 rounded-xl font-black text-base text-white transition-all duration-150 hover:scale-105 active:scale-95 disabled:opacity-50"
                 style={{
                   background: 'linear-gradient(135deg, #ea580c, #f97316)',
                   boxShadow: '0 4px 20px rgba(249,115,22,0.4)',
                 }}
               >
-                {currentQ + 1 >= QUIZ_DATA.questions.length ? (
+                {currentQ + 1 >= session.totalQuestions ? (
                   <>See Results <Home size={18} /></>
                 ) : (
                   <>Next Question <ArrowRight size={18} /></>
