@@ -13,10 +13,14 @@ const router = express.Router();
  */
 router.post('/session', authenticate, async (req, res) => {
   try {
+    console.log('\n=== CREATE GAME SESSION ===');
+    console.log('User ID:', req.user.id);
     const { categoryId, difficulty } = req.body;
+    console.log('Category ID:', categoryId, 'Difficulty:', difficulty);
 
     // Validate input
     if (!categoryId) {
+      console.log('❌ Missing categoryId');
       return res.status(400).json({
         error: 'Bad Request',
         message: 'Category ID is required',
@@ -24,6 +28,7 @@ router.post('/session', authenticate, async (req, res) => {
     }
 
     if (!difficulty || !['easy', 'medium', 'hard'].includes(difficulty)) {
+      console.log('❌ Invalid difficulty:', difficulty);
       return res.status(400).json({
         error: 'Bad Request',
         message: 'Valid difficulty (easy, medium, hard) is required',
@@ -31,6 +36,7 @@ router.post('/session', authenticate, async (req, res) => {
     }
 
     // Create session
+    console.log('Creating session...');
     const session = await gameService.createSession(
       req.user.id,
       categoryId,
@@ -39,14 +45,21 @@ router.post('/session', authenticate, async (req, res) => {
       'standard'
     );
 
+    console.log('✅ Session created:', session.id);
+    console.log('=== CREATE GAME SESSION SUCCESS ===\n');
+
     res.json({
       success: true,
       session,
     });
   } catch (error) {
+    console.error('❌ CREATE GAME SESSION ERROR:', error);
+    console.error('Error stack:', error.stack);
+    console.log('=== CREATE GAME SESSION FAILED ===\n');
     res.status(500).json({
       error: 'Failed to create session',
       message: error.message,
+      details: error.stack,
     });
   }
 });

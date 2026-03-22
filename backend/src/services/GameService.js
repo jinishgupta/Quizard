@@ -35,6 +35,14 @@ export class GameService {
    */
   async createSession(userId, categoryId, difficulty, orangeToken, sessionType = 'standard', customTopic = null) {
     try {
+      console.log('\n>>> GameService.createSession');
+      console.log('User ID:', userId);
+      console.log('Category ID:', categoryId);
+      console.log('Difficulty:', difficulty);
+      console.log('Session Type:', sessionType);
+      console.log('Custom Topic:', customTopic);
+      console.log('Orange Token:', orangeToken ? 'Present' : 'Missing');
+      
       // Determine credit cost based on session type
       let creditCost;
       let actionType;
@@ -55,7 +63,10 @@ export class GameService {
           break;
       }
 
+      console.log('Credit cost:', creditCost, 'Action type:', actionType);
+
       // Redeem credits before creating session
+      console.log('Redeeming credits...');
       const redemptionResult = await creditService.redeemCredits(
         userId,
         creditCost,
@@ -70,27 +81,40 @@ export class GameService {
       );
 
       if (!redemptionResult.success) {
+        console.log('❌ Credit redemption failed:', redemptionResult.message);
         throw new Error(redemptionResult.message || 'Insufficient credits');
       }
 
+      console.log('✅ Credits redeemed successfully');
+
       // Get category info
+      console.log('Fetching category info...');
       const category = await Category.findById(categoryId);
       if (!category) {
+        console.log('❌ Category not found');
         throw new Error('Category not found');
       }
 
+      console.log('✅ Category found:', category.name);
+
       // Create session in database
+      console.log('Creating session in database...');
       const session = await GameSession.create(userId, categoryId, difficulty);
+      console.log('✅ Session created:', session.id);
 
       // Generate questions via AI
+      console.log('Generating questions via AI...');
       const questions = await this.generateQuestions(
         customTopic || category.name,
         difficulty,
         10
       );
 
+      console.log('✅ Questions generated:', questions.length);
+
       // Track AI usage telemetry for question generation
       try {
+        console.log('Tracking AI usage telemetry...');
         await telemetryService.trackAIUsage(userId, 'question_generation', {
           sessionId: session.id,
           topic: customTopic || category.name,

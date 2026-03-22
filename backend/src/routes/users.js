@@ -277,12 +277,17 @@ router.get('/:id/badges', authenticate, async (req, res) => {
       earnedAt: earnedMap.get(badge.id) || null,
     }));
 
+    console.log('✅ Badges retrieved:', badges.length);
+    console.log('=== GET USER BADGES SUCCESS ===\n');
+
     res.json({
-      userId: id,
+      userId: userId,
       badges,
     });
   } catch (error) {
-    console.error('Get user badges error:', error);
+    console.error('❌ GET USER BADGES ERROR:', error);
+    console.error('Error stack:', error.stack);
+    console.log('=== GET USER BADGES FAILED ===\n');
     res.status(500).json({
       error: {
         code: 'SERVER_INTERNAL_ERROR',

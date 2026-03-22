@@ -69,14 +69,26 @@ export class CreditService {
    */
   async redeemCredits(userId, amount, actionType, orangeToken, metadata = {}) {
     try {
+      console.log('\n>>> CreditService.redeemCredits');
+      console.log('User ID:', userId);
+      console.log('Amount:', amount);
+      console.log('Action Type:', actionType);
+      console.log('Orange Token:', orangeToken ? 'Present' : 'Missing');
+      console.log('Metadata:', JSON.stringify(metadata));
+      
       // Get current user balance
+      console.log('Fetching user balance...');
       const user = await User.findById(userId);
       if (!user) {
+        console.log('❌ User not found');
         throw new Error('User not found');
       }
 
+      console.log('Current balance:', user.credits);
+
       // Check if user has sufficient credits
       if (user.credits < amount) {
+        console.log('❌ Insufficient credits. Required:', amount, 'Available:', user.credits);
         return {
           success: false,
           error: 'insufficient_credits',
@@ -86,7 +98,13 @@ export class CreditService {
         };
       }
 
+      console.log('✅ Sufficient credits available');
+
       // Call Orange Game Pass redemption API
+      console.log('Calling Orange Game Pass API...');
+      console.log('API URL:', this.gamePassApiUrl);
+      console.log('Tenant Code:', this.tenantCode);
+      
       const response = await fetch(this.gamePassApiUrl, {
         method: 'POST',
         headers: {
@@ -104,18 +122,31 @@ export class CreditService {
         }),
       });
 
+      console.log('Orange API Response Status:', response.status);
+
       if (!response.ok) {
-        const error = await response.json().catch(() => ({}));
+        const errorText = await response.text();
+        console.log('❌ Orange API Error Response:', errorText);
+        let error;
+        try {
+          error = JSON.parse(errorText);
+        } catch (e) {
+          error = { message: errorText };
+        }
         throw new Error(error.message || `Orange Game Pass API error: ${response.status}`);
       }
 
       const redemptionResult = await response.json();
+      console.log('✅ Orange API Success:', JSON.stringify(redemptionResult));
 
       // Update user credits in database
       const newBalance = user.credits - amount;
+      console.log('Updating user balance to:', newBalance);
       await User.updateCredits(userId, newBalance);
+      console.log('✅ Balance updated');
 
       // Record transaction in credit_transactions table
+      console.log('Recording transaction...');
       await this.recordTransaction(
         userId,
         -amount,
@@ -125,9 +156,14 @@ export class CreditService {
         newBalance,
         metadata
       );
+      console.log('✅ Transaction recorded');
 
       // Track telemetry event
+      console.log('Tracking telemetry...');
       await this.trackCreditRedemption(userId, amount, actionType, redemptionResult.transaction_id || redemptionResult.transactionId);
+      console.log('✅ Telemetry tracked');
+
+      console.log('<<< CreditService.redeemCredits SUCCESS\n');
 
       return {
         success: true,
@@ -136,6 +172,9 @@ export class CreditService {
         remainingBalance: redemptionResult.remaining_balance || redemptionResult.remainingBalance,
       };
     } catch (error) {
+      console.error('❌ CreditService.redeemCredits ERROR:', error);
+      console.error('Error stack:', error.stack);
+      console.log('<<< CreditService.redeemCredits FAILED\n');
       throw new Error(`Failed to redeem credits: ${error.message}`);
     }
   }
@@ -147,7 +186,20 @@ export class CreditService {
    */
   async getBalance(userId) {
     try {
+      console.log('\n>>> CreditService.getBalance');
+      console.log('User ID:', userId);
+      
       const user = await User.findById(userId);
+      
+      if (!user) {
+        console.log('❌ User not found');
+        throw new Error('User not found');
+      }
+      
+      console.log('✅ Balance:', user.credits);
+      console.log('<<< CreditService.getBalance SUCCESS\n');
+      
+      return user.credits;
       if (!user) {
         throw new Error('User not found');
       }
