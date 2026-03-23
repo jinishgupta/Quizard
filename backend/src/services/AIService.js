@@ -374,10 +374,10 @@ Provide a single sentence clue that hints at the answer without giving it away d
    * Requirements: 7.1
    * 
    * @param {string} userId - User ID
-   * @param {string} orangeToken - Orange ID token for credit redemption
+   * @param {string} gamePassToken - Orange Game Pass token for credit redemption
    * @returns {Promise<Object>} Early digest result
    */
-  async requestEarlyDigest(userId, orangeToken) {
+  async requestEarlyDigest(userId, gamePassToken) {
     try {
       // Get current week
       const { weekNumber, year } = this.getCurrentWeek();
@@ -406,7 +406,7 @@ Provide a single sentence clue that hints at the answer without giving it away d
         userId,
         creditCost,
         'EARLY_DIGEST',
-        orangeToken,
+        gamePassToken,
         { weekNumber, year }
       );
 

@@ -54,7 +54,7 @@ router.post('/redeem', authenticate, async (req, res) => {
       req.user.id,
       amount,
       actionType,
-      req.token,
+      req.gamePassToken,
       metadata || {}
     );
 
@@ -119,7 +119,7 @@ router.get('/history', authenticate, async (req, res) => {
  */
 router.post('/sync', authenticate, async (req, res) => {
   try {
-    const result = await creditService.syncWithOrangePass(req.user.id, req.token);
+    const result = await creditService.syncWithOrangePass(req.user.id, req.gamePassToken);
 
     res.json({
       success: true,

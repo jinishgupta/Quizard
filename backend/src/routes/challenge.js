@@ -41,7 +41,7 @@ router.post('/create', authenticate, async (req, res) => {
       opponentId,
       categoryId,
       difficulty,
-      req.token
+      req.gamePassToken
     );
 
     res.json({

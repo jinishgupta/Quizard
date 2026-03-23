@@ -63,18 +63,23 @@ export class CreditService {
    * @param {string} userId - User ID
    * @param {number} amount - Amount of credits to redeem
    * @param {string} actionType - Type of action (e.g., 'STANDARD_ROUND', 'HINT_ELIMINATE')
-   * @param {string} orangeToken - Orange ID token for authentication
+   * @param {string} gamePassToken - Orange Game Pass token for authentication
    * @param {Object} metadata - Additional metadata for the transaction
    * @returns {Promise<Object>} Redemption result with success, newBalance, orangeTransactionId
    */
-  async redeemCredits(userId, amount, actionType, orangeToken, metadata = {}) {
+  async redeemCredits(userId, amount, actionType, gamePassToken, metadata = {}) {
     try {
       console.log('\n>>> CreditService.redeemCredits');
       console.log('User ID:', userId);
       console.log('Amount:', amount);
       console.log('Action Type:', actionType);
-      console.log('Orange Token:', orangeToken ? 'Present' : 'Missing');
+      console.log('Game Pass Token:', gamePassToken ? 'Present' : 'Missing');
       console.log('Metadata:', JSON.stringify(metadata));
+
+      // Validate Game Pass token
+      if (!gamePassToken) {
+        throw new Error('Orange Game Pass token is missing. Please ensure you accessed the app via an Orange Game Pass link.');
+      }
       
       // Get current user balance
       console.log('Fetching user balance...');
@@ -108,7 +113,7 @@ export class CreditService {
       const response = await fetch(this.gamePassApiUrl, {
         method: 'POST',
         headers: {
-          'Authorization': `Bearer ${orangeToken}`,
+          'Authorization': `Bearer ${gamePassToken}`,
           'Content-Type': 'application/json',
         },
         body: JSON.stringify({
@@ -200,10 +205,6 @@ export class CreditService {
       console.log('<<< CreditService.getBalance SUCCESS\n');
       
       return user.credits;
-      if (!user) {
-        throw new Error('User not found');
-      }
-      return user.credits;
     } catch (error) {
       throw new Error(`Failed to get balance: ${error.message}`);
     }
@@ -213,10 +214,10 @@ export class CreditService {
    * Sync balance with Orange Game Pass
    * Note: This is a placeholder - actual implementation depends on Orange API
    * @param {string} userId - User ID
-   * @param {string} orangeToken - Orange ID token
+   * @param {string} gamePassToken - Orange Game Pass token
    * @returns {Promise<Object>} Sync result
    */
-  async syncWithOrangePass(userId, orangeToken) {
+  async syncWithOrangePass(userId, gamePassToken) {
     try {
       // In a real implementation, this would call an Orange API endpoint
       // to get the authoritative balance from Orange Game Pass

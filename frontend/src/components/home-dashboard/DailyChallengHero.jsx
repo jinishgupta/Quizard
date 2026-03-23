@@ -2,6 +2,7 @@ import React from 'react';
 import { Link } from 'react-router-dom';
 import { Play, Star, Zap, Clock } from 'lucide-react';
 import { motion } from 'framer-motion';
+import { useCategories } from '../../hooks/useApi';
 
 const DAILY_CHALLENGE = {
   topic: 'The Frontier of Machine Intelligence',
@@ -15,6 +16,12 @@ const DAILY_CHALLENGE = {
 };
 
 export default function DailyChallengHero() {
+  const { data: categoriesData } = useCategories();
+  const categories = categoriesData?.categories || [];
+  
+  // Use first category as daily challenge, or fallback
+  const dailyCategory = categories.find(c => c.name.toLowerCase().includes('tech')) || categories[0];
+
   return (
     <motion.div
       initial={{ opacity: 0, y: 16 }}
@@ -113,17 +120,32 @@ export default function DailyChallengHero() {
           </div>
 
           <div className="flex flex-col gap-3 md:items-end">
-            <Link
-              to="/play-screen"
-              className="group inline-flex items-center justify-center gap-2 px-8 py-4 rounded-2xl font-black text-lg text-orange-600 transition-all duration-150 hover:scale-105 active:scale-95"
-              style={{
-                background: 'linear-gradient(135deg, #ffffff, #fff7ed)',
-                boxShadow: '0 4px 20px rgba(0,0,0,0.25), inset 0 1px 0 rgba(255,255,255,0.5)',
-              }}
-            >
-              <Play size={20} className="fill-orange-500" />
-              Play Today's Challenge
-            </Link>
+            {dailyCategory ? (
+              <Link
+                to="/play-screen"
+                state={{ categoryId: dailyCategory.id, categoryName: dailyCategory.name }}
+                className="group inline-flex items-center justify-center gap-2 px-8 py-4 rounded-2xl font-black text-lg text-orange-600 transition-all duration-150 hover:scale-105 active:scale-95"
+                style={{
+                  background: 'linear-gradient(135deg, #ffffff, #fff7ed)',
+                  boxShadow: '0 4px 20px rgba(0,0,0,0.25), inset 0 1px 0 rgba(255,255,255,0.5)',
+                }}
+              >
+                <Play size={20} className="fill-orange-500" />
+                Play Today's Challenge
+              </Link>
+            ) : (
+              <button
+                disabled
+                className="group inline-flex items-center justify-center gap-2 px-8 py-4 rounded-2xl font-black text-lg text-orange-600 opacity-50 cursor-not-allowed"
+                style={{
+                  background: 'linear-gradient(135deg, #ffffff, #fff7ed)',
+                  boxShadow: '0 4px 20px rgba(0,0,0,0.25), inset 0 1px 0 rgba(255,255,255,0.5)',
+                }}
+              >
+                <Play size={20} className="fill-orange-500" />
+                Loading...
+              </button>
+            )}
             <p className="text-white/60 text-xs text-center md:text-right">
               Complete for <span className="text-yellow-300 font-bold">+50 league points</span>
             </p>

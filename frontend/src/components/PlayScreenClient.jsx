@@ -50,10 +50,12 @@ export default function PlayScreenClient() {
       { categoryId, difficulty: 'medium' },
       {
         onSuccess: (data) => {
+          console.log("success", data);
           setSession(data.session);
           setTimeLeft(data.session.questions[0]?.timeLimit || 30);
         },
         onError: (error) => {
+          console.log("error",error);
           toast.error(error.message || 'Failed to create session');
           navigate('/home-dashboard');
         },

@@ -49,6 +49,14 @@ export async function authenticate(req, res, next) {
     req.user = user;
     req.orangeUser = orangeUser;
     req.token = token;
+    
+    // Extract Orange Game Pass token (separate from Bedrock auth token)
+    req.gamePassToken = req.headers['x-game-pass-token'] || null;
+    if (req.gamePassToken) {
+      console.log('✅ Game Pass Token present');
+    } else {
+      console.log('⚠️ No Game Pass Token in request');
+    }
 
     console.log('=== AUTHENTICATION SUCCESS ===\n');
     next();

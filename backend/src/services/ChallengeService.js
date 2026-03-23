@@ -68,10 +68,10 @@ export class ChallengeService {
    * @param {string} opponentId - Opponent user ID
    * @param {string} categoryId - Category ID
    * @param {string} difficulty - Difficulty level
-   * @param {string} orangeToken - Orange ID token for credit redemption
+   * @param {string} gamePassToken - Orange Game Pass token for credit redemption
    * @returns {Promise<Object>} Challenge data
    */
-  async createChallenge(challengerId, opponentId, categoryId, difficulty, orangeToken) {
+  async createChallenge(challengerId, opponentId, categoryId, difficulty, gamePassToken) {
     try {
       // Validate inputs
       if (challengerId === opponentId) {
@@ -84,7 +84,7 @@ export class ChallengeService {
         challengerId,
         creditCost,
         'SEND_CHALLENGE',
-        orangeToken,
+        gamePassToken,
         { opponentId, categoryId, difficulty }
       );
 

@@ -56,24 +56,22 @@ router.get('/digest', authenticate, async (req, res) => {
 /**
  * POST /api/ai/digest/early
  * Request early digest generation (costs CREDITS_EARLY_DIGEST)
- * Body: { orangeToken: string }
  */
 router.post('/digest/early', authenticate, async (req, res) => {
   try {
     const userId = req.user.id;
-    const { orangeToken } = req.body;
 
-    if (!orangeToken) {
+    if (!req.gamePassToken) {
       return res.status(400).json({
         error: {
           code: 'VALIDATION_MISSING_FIELD',
-          message: 'Orange token is required',
+          message: 'Orange Game Pass token is required. Please access the app via an Orange Game Pass link.',
           timestamp: new Date().toISOString(),
         },
       });
     }
 
-    const result = await aiService.requestEarlyDigest(userId, orangeToken);
+    const result = await aiService.requestEarlyDigest(userId, req.gamePassToken);
 
     res.json({
       success: result.success,

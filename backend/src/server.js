@@ -141,7 +141,7 @@ io.on('connection', (socket) => {
         return;
       }
 
-      const { opponentId, categoryId, difficulty, token } = data;
+      const { opponentId, categoryId, difficulty, gamePassToken } = data;
 
       // Create challenge (charges CREDITS_SEND_CHALLENGE)
       const challenge = await challengeService.createChallenge(
@@ -149,7 +149,7 @@ io.on('connection', (socket) => {
         opponentId,
         categoryId,
         difficulty,
-        token
+        gamePassToken
       );
 
       // Challenger joins the socket room immediately

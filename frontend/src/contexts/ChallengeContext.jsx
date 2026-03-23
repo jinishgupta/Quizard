@@ -162,7 +162,7 @@ export const ChallengeProvider = ({ children }) => {
       opponentId,
       categoryId,
       difficulty,
-      token,
+      gamePassToken: sessionStorage.getItem('game_pass_token'),
     });
   };
 

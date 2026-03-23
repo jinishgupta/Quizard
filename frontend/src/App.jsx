@@ -95,6 +95,24 @@ const PassportProvider = ({ children }) => {
 };
 
 function App() {
+  // Capture Orange Game Pass token from URL on app load
+  useEffect(() => {
+    const params = new URLSearchParams(window.location.search);
+    const passToken = params.get('pass_token');
+    
+    if (passToken) {
+      // Store in sessionStorage (per Orange Game Pass best practices)
+      sessionStorage.setItem('game_pass_token', passToken);
+      console.log('✅ Orange Game Pass token captured and stored');
+      
+      // Remove pass_token from URL to prevent accidental exposure
+      params.delete('pass_token');
+      const newSearch = params.toString();
+      const newUrl = window.location.pathname + (newSearch ? `?${newSearch}` : '') + window.location.hash;
+      window.history.replaceState({}, '', newUrl);
+    }
+  }, []);
+
   // Wagmi configuration
   const config = createConfig({
     chains: [mainnet],

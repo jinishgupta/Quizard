@@ -28,12 +28,12 @@ export class GameService {
    * @param {string} userId - User ID
    * @param {string} categoryId - Category ID
    * @param {string} difficulty - Difficulty level (easy, medium, hard)
-   * @param {string} orangeToken - Orange ID token for credit redemption
+   * @param {string} gamePassToken - Orange Game Pass token for credit redemption
    * @param {string} sessionType - Session type: 'standard', 'custom', 'bonus'
    * @param {string} customTopic - Custom topic for custom quizzes
    * @returns {Promise<Object>} Session data with first question
    */
-  async createSession(userId, categoryId, difficulty, orangeToken, sessionType = 'standard', customTopic = null) {
+  async createSession(userId, categoryId, difficulty, gamePassToken, sessionType = 'standard', customTopic = null) {
     try {
       console.log('\n>>> GameService.createSession');
       console.log('User ID:', userId);
@@ -41,7 +41,7 @@ export class GameService {
       console.log('Difficulty:', difficulty);
       console.log('Session Type:', sessionType);
       console.log('Custom Topic:', customTopic);
-      console.log('Orange Token:', orangeToken ? 'Present' : 'Missing');
+      console.log('Game Pass Token:', gamePassToken ? 'Present' : 'Missing');
       
       // Determine credit cost based on session type
       let creditCost;
@@ -71,7 +71,7 @@ export class GameService {
         userId,
         creditCost,
         actionType,
-        orangeToken,
+        gamePassToken,
         {
           categoryId,
           difficulty,
@@ -443,10 +443,10 @@ Generate ${count} questions now:`;
    * 
    * @param {string} userId - User ID
    * @param {string} sessionId - Session ID
-   * @param {string} orangeToken - Orange ID token
+   * @param {string} gamePassToken - Orange Game Pass token
    * @returns {Promise<Object>} Explanations for all questions
    */
-  async unlockExplanation(userId, sessionId, orangeToken) {
+  async unlockExplanation(userId, sessionId, gamePassToken) {
     try {
       // Redeem credits
       const creditCost = creditService.constructor.COSTS.EXPLANATION_PACK;
@@ -454,7 +454,7 @@ Generate ${count} questions now:`;
         userId,
         creditCost,
         'EXPLANATION_PACK',
-        orangeToken,
+        gamePassToken,
         { sessionId }
       );
 
@@ -497,10 +497,10 @@ Generate ${count} questions now:`;
    * @param {string} userId - User ID
    * @param {string} sessionId - Session ID
    * @param {number} questionIndex - Question index
-   * @param {string} orangeToken - Orange ID token
+   * @param {string} gamePassToken - Orange Game Pass token
    * @returns {Promise<Object>} Remaining options
    */
-  async eliminateWrongAnswers(userId, sessionId, questionIndex, orangeToken) {
+  async eliminateWrongAnswers(userId, sessionId, questionIndex, gamePassToken) {
     try {
       const sessionData = this.activeSessions.get(sessionId);
       if (!sessionData) {
@@ -518,7 +518,7 @@ Generate ${count} questions now:`;
         userId,
         creditCost,
         'HINT_ELIMINATE',
-        orangeToken,
+        gamePassToken,
         { sessionId, questionIndex }
       );
 
@@ -567,10 +567,10 @@ Generate ${count} questions now:`;
    * @param {string} userId - User ID
    * @param {string} sessionId - Session ID
    * @param {number} questionIndex - Question index
-   * @param {string} orangeToken - Orange ID token
+   * @param {string} gamePassToken - Orange Game Pass token
    * @returns {Promise<Object>} Contextual clue
    */
-  async getContextualClue(userId, sessionId, questionIndex, orangeToken) {
+  async getContextualClue(userId, sessionId, questionIndex, gamePassToken) {
     try {
       const sessionData = this.activeSessions.get(sessionId);
       if (!sessionData) {
@@ -588,7 +588,7 @@ Generate ${count} questions now:`;
         userId,
         creditCost,
         'HINT_CLUE',
-        orangeToken,
+        gamePassToken,
         { sessionId, questionIndex }
       );
 
@@ -643,10 +643,10 @@ Provide a single sentence clue that hints at the answer without giving it away d
    * @param {string} userId - User ID
    * @param {string} sessionId - Session ID
    * @param {number} questionIndex - Question index
-   * @param {string} orangeToken - Orange ID token
+   * @param {string} gamePassToken - Orange Game Pass token
    * @returns {Promise<Object>} First letter hint
    */
-  async revealFirstLetter(userId, sessionId, questionIndex, orangeToken) {
+  async revealFirstLetter(userId, sessionId, questionIndex, gamePassToken) {
     try {
       const sessionData = this.activeSessions.get(sessionId);
       if (!sessionData) {
@@ -664,7 +664,7 @@ Provide a single sentence clue that hints at the answer without giving it away d
         userId,
         creditCost,
         'HINT_FIRST_LETTER',
-        orangeToken,
+        gamePassToken,
         { sessionId, questionIndex }
       );
 

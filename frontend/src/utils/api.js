@@ -1,5 +1,13 @@
 const API_URL = import.meta.env.VITE_API_URL;
 
+/**
+ * Get the Orange Game Pass token from sessionStorage
+ * This token is captured from the URL when the user enters the app
+ */
+const getGamePassToken = () => {
+  return sessionStorage.getItem('game_pass_token');
+};
+
 let isRefreshing = false;
 let refreshSubscribers = [];
 
@@ -150,6 +158,12 @@ export const apiRequest = async (endpoint, options = {}) => {
 
   if (token) {
     defaultHeaders['Authorization'] = `Bearer ${token}`;
+  }
+
+  // Attach Orange Game Pass token for credit redemption
+  const gamePassToken = getGamePassToken();
+  if (gamePassToken) {
+    defaultHeaders['X-Game-Pass-Token'] = gamePassToken;
   }
 
   const config = {

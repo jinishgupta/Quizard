@@ -10,7 +10,7 @@ const router = express.Router();
  * POST /api/game/session
  * Create new standard game session (charges CREDITS_STANDARD_ROUND)
  * Body: { categoryId, difficulty }
- */
+ */ 
 router.post('/session', authenticate, async (req, res) => {
   try {
     console.log('\n=== CREATE GAME SESSION ===');
@@ -41,7 +41,7 @@ router.post('/session', authenticate, async (req, res) => {
       req.user.id,
       categoryId,
       difficulty,
-      req.token,
+      req.gamePassToken,
       'standard'
     );
 
@@ -104,7 +104,7 @@ router.post('/session/custom', authenticate, async (req, res) => {
       req.user.id,
       defaultCategory.id,
       difficulty,
-      req.token,
+      req.gamePassToken,
       'custom',
       topic
     );
@@ -153,7 +153,7 @@ router.post('/session/bonus', authenticate, async (req, res) => {
       req.user.id,
       categoryId,
       difficulty,
-      req.token,
+      req.gamePassToken,
       'bonus'
     );
 
@@ -355,7 +355,7 @@ router.post('/unlock-explanation', authenticate, async (req, res) => {
     const result = await gameService.unlockExplanation(
       req.user.id,
       sessionId,
-      req.token
+      req.gamePassToken
     );
 
     res.json(result);
@@ -404,7 +404,7 @@ router.post('/hint/eliminate', authenticate, async (req, res) => {
       req.user.id,
       sessionId,
       questionIndex,
-      req.token
+      req.gamePassToken
     );
 
     res.json(result);
@@ -453,7 +453,7 @@ router.post('/hint/clue', authenticate, async (req, res) => {
       req.user.id,
       sessionId,
       questionIndex,
-      req.token
+      req.gamePassToken
     );
 
     res.json(result);
@@ -502,7 +502,7 @@ router.post('/hint/first-letter', authenticate, async (req, res) => {
       req.user.id,
       sessionId,
       questionIndex,
-      req.token
+      req.gamePassToken
     );
 
     res.json(result);
