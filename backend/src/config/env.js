@@ -32,17 +32,6 @@ export const config = {
     resetDay: parseInt(process.env.LEAGUE_RESET_DAY, 10) || 0,
     resetHour: parseInt(process.env.LEAGUE_RESET_HOUR, 10) || 0,
   },
-  credits: {
-    standardRound: parseInt(process.env.CREDITS_STANDARD_ROUND, 10) || 12,
-    hintEliminate: parseInt(process.env.CREDITS_HINT_ELIMINATE, 10) || 6,
-    hintClue: parseInt(process.env.CREDITS_HINT_CLUE, 10) || 6,
-    hintFirstLetter: parseInt(process.env.CREDITS_HINT_FIRST_LETTER, 10) || 6,
-    explanationPack: parseInt(process.env.CREDITS_EXPLANATION_PACK, 10) || 15,
-    bonusRound: parseInt(process.env.CREDITS_BONUS_ROUND, 10) || 10,
-    customQuiz: parseInt(process.env.CREDITS_CUSTOM_QUIZ, 10) || 30,
-    sendChallenge: parseInt(process.env.CREDITS_SEND_CHALLENGE, 10) || 10,
-    earlyDigest: parseInt(process.env.CREDITS_EARLY_DIGEST, 10) || 10,
-  },
 };
 
 export function validateConfig() {

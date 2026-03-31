@@ -1,7 +1,6 @@
 import { GoogleGenAI } from '@google/genai';
 import { config } from '../config/env.js';
 import { supabase } from '../db/index.js';
-import creditService from './CreditService.js';
 import telemetryService from './TelemetryService.js';
 
 /**
@@ -400,28 +399,12 @@ Provide a single sentence clue that hints at the answer without giving it away d
         };
       }
 
-      // Redeem credits
-      const creditCost = creditService.constructor.COSTS.EARLY_DIGEST;
-      const redemptionResult = await creditService.redeemCredits(
-        userId,
-        creditCost,
-        'EARLY_DIGEST',
-        gamePassToken,
-        { weekNumber, year }
-      );
-
-      if (!redemptionResult.success) {
-        throw new Error(redemptionResult.message || 'Insufficient credits');
-      }
-
       // Generate digest
       const digest = await this.generateWeeklyDigest(userId, weekNumber, year);
 
       return {
         success: true,
         digest,
-        creditsCharged: creditCost,
-        newBalance: redemptionResult.newBalance,
       };
     } catch (error) {
       throw new Error(`Failed to request early digest: ${error.message}`);

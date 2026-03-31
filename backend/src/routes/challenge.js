@@ -1,6 +1,7 @@
 import express from 'express';
 import challengeService from '../services/ChallengeService.js';
 import { authenticate } from '../middleware/auth.js';
+import { requireActiveGamePass } from '../middleware/gamepass.js';
 
 const router = express.Router();
 
@@ -9,7 +10,7 @@ const router = express.Router();
  * Create a new challenge (charges CREDITS_SEND_CHALLENGE)
  * Body: { opponentId, categoryId, difficulty }
  */
-router.post('/create', authenticate, async (req, res) => {
+router.post('/create', authenticate, requireActiveGamePass, async (req, res) => {
   try {
     const { opponentId, categoryId, difficulty } = req.body;
 

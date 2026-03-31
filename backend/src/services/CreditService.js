@@ -17,31 +17,7 @@ export class CreditService {
     this.gamePassApiUrl = config.orange.gamePassApiUrl || 'https://app.orangeweb3.com/api/games/passes/redeem';
   }
 
-  /**
-   * Credit cost constants for all 9 action types
-   * 
-   * Action Types and Costs:
-   * - STANDARD_ROUND (12 credits): Playing a 10-question standard round
-   * - HINT_ELIMINATE (6 credits): Removing two wrong answer options
-   * - HINT_CLUE (6 credits): Receiving a contextual clue from Gemini
-   * - HINT_FIRST_LETTER (6 credits): Revealing first letter of correct answer
-   * - EXPLANATION_PACK (15 credits): Post-round AI explanations for all 10 questions
-   * - BONUS_ROUND (10 credits): Sudden-death bonus round after standard round
-   * - CUSTOM_QUIZ (30 credits): User-defined topic quiz (highest token cost)
-   * - SEND_CHALLENGE (10 credits): Sending a friend challenge link
-   * - EARLY_DIGEST (10 credits): Requesting weekly digest before Monday auto-generation
-   */
-  static COSTS = {
-    STANDARD_ROUND: config.credits.standardRound,           // 12 credits
-    HINT_ELIMINATE: config.credits.hintEliminate,           // 6 credits
-    HINT_CLUE: config.credits.hintClue,                     // 6 credits
-    HINT_FIRST_LETTER: config.credits.hintFirstLetter,      // 6 credits
-    EXPLANATION_PACK: config.credits.explanationPack,       // 15 credits
-    BONUS_ROUND: config.credits.bonusRound,                 // 10 credits
-    CUSTOM_QUIZ: config.credits.customQuiz,                 // 30 credits
-    SEND_CHALLENGE: config.credits.sendChallenge,           // 10 credits
-    EARLY_DIGEST: config.credits.earlyDigest,               // 10 credits
-  };
+  // Per-action costs removed in favor of Timed Access Game Pass model (e.g. 50 credits for 10 minutes).
 
   /**
    * Redeem credits by calling Orange Game Pass API

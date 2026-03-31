@@ -1,6 +1,7 @@
 import express from 'express';
 import aiService from '../services/AIService.js';
 import { authenticate } from '../middleware/auth.js';
+import { requireActiveGamePass } from '../middleware/gamepass.js';
 
 const router = express.Router();
 
@@ -57,19 +58,9 @@ router.get('/digest', authenticate, async (req, res) => {
  * POST /api/ai/digest/early
  * Request early digest generation (costs CREDITS_EARLY_DIGEST)
  */
-router.post('/digest/early', authenticate, async (req, res) => {
+router.post('/digest/early', authenticate, requireActiveGamePass, async (req, res) => {
   try {
     const userId = req.user.id;
-
-    if (!req.gamePassToken) {
-      return res.status(400).json({
-        error: {
-          code: 'VALIDATION_MISSING_FIELD',
-          message: 'Orange Game Pass token is required. Please access the app via an Orange Game Pass link.',
-          timestamp: new Date().toISOString(),
-        },
-      });
-    }
 
     const result = await aiService.requestEarlyDigest(userId, req.gamePassToken);
 
@@ -86,8 +77,6 @@ router.post('/digest/early', authenticate, async (req, res) => {
         funFact: result.digest.fun_fact,
         generatedAt: result.digest.generated_at,
       },
-      creditsCharged: result.creditsCharged,
-      newBalance: result.newBalance,
       message: result.message,
     });
   } catch (error) {

@@ -1,5 +1,4 @@
 import { supabase } from '../db/index.js';
-import creditService from './CreditService.js';
 import gameService from './GameService.js';
 import telemetryService from './TelemetryService.js';
 
@@ -78,20 +77,6 @@ export class ChallengeService {
         throw new Error('Cannot challenge yourself');
       }
 
-      // Redeem credits for creating challenge
-      const creditCost = creditService.constructor.COSTS.SEND_CHALLENGE;
-      const redemptionResult = await creditService.redeemCredits(
-        challengerId,
-        creditCost,
-        'SEND_CHALLENGE',
-        gamePassToken,
-        { opponentId, categoryId, difficulty }
-      );
-
-      if (!redemptionResult.success) {
-        throw new Error(redemptionResult.message || 'Insufficient credits');
-      }
-
       // Create challenge record in database
       const { data, error } = await supabase
         .from('challenges')
@@ -114,8 +99,6 @@ export class ChallengeService {
         categoryId: data.category_id,
         difficulty: data.difficulty,
         status: data.status,
-        creditsCharged: creditCost,
-        newBalance: redemptionResult.newBalance,
         createdAt: data.created_at,
       };
     } catch (error) {
