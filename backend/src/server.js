@@ -12,6 +12,7 @@ import leagueRoutes from './routes/league.js';
 import aiRoutes from './routes/ai.js';
 import challengeRoutes from './routes/challenge.js';
 import telemetryRoutes from './routes/telemetry.js';
+import gamepassRoutes from './routes/gamepass.js';
 import adminRoutes from './routes/admin.js';
 import leagueResetScheduler from './services/LeagueResetScheduler.js';
 import weeklyDigestScheduler from './services/WeeklyDigestScheduler.js';
@@ -20,20 +21,30 @@ import orangeAuthService from './services/OrangeAuthService.js';
 
 const app = express();
 const httpServer = createServer(app);
+
+// Allowed origins for CORS (frontend URLs)
+const ALLOWED_ORIGINS = [
+  'http://localhost:5173',
+  'http://127.0.0.1:5173',
+  config.server.frontendUrl,
+].filter(Boolean);
+
 const io = new Server(httpServer, {
   cors: {
-    origin: [
-      'http://localhost:5173', 
-      'http://127.0.0.1:5173',
-      'https://quizard-gljo.onrender.com'
-    ],
+    origin: ALLOWED_ORIGINS,
     methods: ['GET', 'POST'],
     credentials: true,
   },
 });
 
 // Middleware
-app.use(cors());
+app.use(cors({
+  origin: ALLOWED_ORIGINS,
+  credentials: true,
+  methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
+  allowedHeaders: ['Content-Type', 'Authorization', 'X-Game-Pass-Token'],
+  exposedHeaders: ['X-Game-Pass-Status'],
+}));
 app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
 
@@ -67,6 +78,7 @@ app.use('/api/ai', aiRoutes);
 app.use('/api/challenge', challengeRoutes);
 app.use('/api/telemetry', telemetryRoutes);
 app.use('/api/admin', adminRoutes);
+app.use('/api/gamepass', gamepassRoutes);
 
 // Error logging middleware (must be after routes)
 app.use(errorLogger);

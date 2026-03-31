@@ -1,8 +1,7 @@
-import { GoogleGenAI  } from '@google/genai';
+import { GoogleGenAI } from '@google/genai';
 import { config } from '../config/env.js';
 import { GameSession } from '../db/models/GameSession.js';
 import { Category } from '../db/models/Category.js';
-import creditService from './CreditService.js';
 import progressionService from './ProgressionService.js';
 import leagueService from './LeagueService.js';
 import telemetryService from './TelemetryService.js';
@@ -11,7 +10,10 @@ import telemetryService from './TelemetryService.js';
  * Game Service
  * Handles quiz gameplay, AI question generation, scoring, and hint system
  * 
- * IMPORTANT: NO questions table - all questions generated on-demand by Google Gemini
+ * TIMED ACCESS MODEL:
+ * - All features are FREE while game pass is active
+ * - Hints have cooldown timers to prevent spam
+ * - No per-action credit costs
  */
 export class GameService {
   constructor() {
@@ -19,86 +21,73 @@ export class GameService {
     
     // In-memory storage for active sessions (questions and hints)
     this.activeSessions = new Map();
+
+    // Hint cooldown timers per user (userId -> { lastHintTime })
+    // Cooldown periods in seconds
+    this.HINT_COOLDOWNS = {
+      eliminate: 60,   // 60 second cooldown
+      clue: 60,        // 60 second cooldown
+      firstLetter: 60, // 60 second cooldown
+    };
+    this.userHintCooldowns = new Map();
+  }
+
+  /**
+   * Check if a hint is on cooldown for a user
+   * @param {string} userId - User ID
+   * @param {string} hintType - Type of hint
+   * @returns {{ onCooldown: boolean, remainingSeconds: number }}
+   */
+  checkHintCooldown(userId, hintType) {
+    const key = `${userId}:${hintType}`;
+    const lastUsed = this.userHintCooldowns.get(key);
+    
+    if (!lastUsed) return { onCooldown: false, remainingSeconds: 0 };
+    
+    const elapsed = (Date.now() - lastUsed) / 1000;
+    const cooldownPeriod = this.HINT_COOLDOWNS[hintType] || 10;
+    
+    if (elapsed < cooldownPeriod) {
+      return {
+        onCooldown: true,
+        remainingSeconds: Math.ceil(cooldownPeriod - elapsed),
+      };
+    }
+    
+    return { onCooldown: false, remainingSeconds: 0 };
+  }
+
+  /**
+   * Record hint usage for cooldown tracking
+   * @param {string} userId - User ID
+   * @param {string} hintType - Type of hint
+   */
+  recordHintUsage(userId, hintType) {
+    const key = `${userId}:${hintType}`;
+    this.userHintCooldowns.set(key, Date.now());
   }
 
   /**
    * Create a new quiz session
-   * Charges CREDITS_STANDARD_ROUND for standard sessions
-   * 
-   * @param {string} userId - User ID
-   * @param {string} categoryId - Category ID
-   * @param {string} difficulty - Difficulty level (easy, medium, hard)
-   * @param {string} gamePassToken - Orange Game Pass token for credit redemption
-   * @param {string} sessionType - Session type: 'standard', 'custom', 'bonus'
-   * @param {string} customTopic - Custom topic for custom quizzes
-   * @returns {Promise<Object>} Session data with first question
+   * FREE with active game pass — no credit charges
    */
-  async createSession(userId, categoryId, difficulty, gamePassToken, sessionType = 'standard', customTopic = null) {
+  async createSession(userId, categoryId, difficulty, sessionType = 'standard', customTopic = null) {
     try {
       console.log('\n>>> GameService.createSession');
       console.log('User ID:', userId);
       console.log('Category ID:', categoryId);
       console.log('Difficulty:', difficulty);
       console.log('Session Type:', sessionType);
-      console.log('Custom Topic:', customTopic);
-      console.log('Game Pass Token:', gamePassToken ? 'Present' : 'Missing');
-      
-      // Determine credit cost based on session type
-      let creditCost;
-      let actionType;
-      
-      switch (sessionType) {
-        case 'custom':
-          creditCost = creditService.constructor.COSTS.CUSTOM_QUIZ;
-          actionType = 'CUSTOM_QUIZ';
-          break;
-        case 'bonus':
-          creditCost = creditService.constructor.COSTS.BONUS_ROUND;
-          actionType = 'BONUS_ROUND';
-          break;
-        case 'standard':
-        default:
-          creditCost = creditService.constructor.COSTS.STANDARD_ROUND;
-          actionType = 'STANDARD_ROUND';
-          break;
-      }
-
-      console.log('Credit cost:', creditCost, 'Action type:', actionType);
-
-      // Redeem credits before creating session
-      console.log('Redeeming credits...');
-      const redemptionResult = await creditService.redeemCredits(
-        userId,
-        creditCost,
-        actionType,
-        gamePassToken,
-        {
-          categoryId,
-          difficulty,
-          sessionType,
-          customTopic,
-        }
-      );
-
-      if (!redemptionResult.success) {
-        console.log('❌ Credit redemption failed:', redemptionResult.message);
-        throw new Error(redemptionResult.message || 'Insufficient credits');
-      }
-
-      console.log('✅ Credits redeemed successfully');
 
       // Get category info
-      console.log('Fetching category info...');
       const category = await Category.findById(categoryId);
       if (!category) {
-        console.log('❌ Category not found');
         throw new Error('Category not found');
       }
 
       console.log('✅ Category found:', category.name);
 
       // Create session in database
-      console.log('Creating session in database...');
       const session = await GameSession.create(userId, categoryId, difficulty);
       console.log('✅ Session created:', session.id);
 
@@ -112,9 +101,8 @@ export class GameService {
 
       console.log('✅ Questions generated:', questions.length);
 
-      // Track AI usage telemetry for question generation
+      // Track AI usage telemetry
       try {
-        console.log('Tracking AI usage telemetry...');
         await telemetryService.trackAIUsage(userId, 'question_generation', {
           sessionId: session.id,
           topic: customTopic || category.name,
@@ -147,8 +135,6 @@ export class GameService {
         totalQuestions: questions.length,
         currentQuestion: 1,
         question: this.formatQuestion(questions[0], 0),
-        creditsCharged: creditCost,
-        newBalance: redemptionResult.newBalance,
       };
     } catch (error) {
       throw new Error(`Failed to create session: ${error.message}`);
@@ -157,11 +143,6 @@ export class GameService {
 
   /**
    * Generate questions via Google Gemini AI
-   * 
-   * @param {string} topic - Topic/category name
-   * @param {string} difficulty - Difficulty level
-   * @param {number} count - Number of questions to generate
-   * @returns {Promise<Array>} Array of generated questions
    */
   async generateQuestions(topic, difficulty, count = 10) {
     try {
@@ -192,7 +173,7 @@ Generate ${count} questions now:`;
       });
       const text = result.text;
 
-      // Extract JSON from response (handle markdown code blocks)
+      // Extract JSON from response
       let jsonText = text.trim();
       if (jsonText.startsWith('```json')) {
         jsonText = jsonText.substring(7);
@@ -206,22 +187,16 @@ Generate ${count} questions now:`;
 
       const questions = JSON.parse(jsonText);
 
-      // Validate questions
       if (!Array.isArray(questions) || questions.length === 0) {
         throw new Error('Invalid questions format from AI');
       }
 
-      const formattedQuestions = questions.map(q => ({
+      return questions.map(q => ({
         question: q.question,
         options: q.options,
         correctAnswer: q.correctAnswer,
         explanation: q.explanation || 'No explanation provided.',
       }));
-
-      // Track AI usage telemetry for question generation
-      // Note: We don't have userId in this context, so telemetry is tracked at session creation
-      
-      return formattedQuestions;
     } catch (error) {
       throw new Error(`Failed to generate questions: ${error.message}`);
     }
@@ -229,9 +204,6 @@ Generate ${count} questions now:`;
 
   /**
    * Get next question for a session
-   * 
-   * @param {string} sessionId - Session ID
-   * @returns {Promise<Object>} Next question data
    */
   async getNextQuestion(sessionId) {
     try {
@@ -243,19 +215,14 @@ Generate ${count} questions now:`;
       const { questions, currentQuestionIndex } = sessionData;
 
       if (currentQuestionIndex >= questions.length) {
-        return {
-          completed: true,
-          message: 'All questions answered',
-        };
+        return { completed: true, message: 'All questions answered' };
       }
-
-      const question = questions[currentQuestionIndex];
 
       return {
         completed: false,
         currentQuestion: currentQuestionIndex + 1,
         totalQuestions: questions.length,
-        question: this.formatQuestion(question, currentQuestionIndex),
+        question: this.formatQuestion(questions[currentQuestionIndex], currentQuestionIndex),
       };
     } catch (error) {
       throw new Error(`Failed to get next question: ${error.message}`);
@@ -264,11 +231,6 @@ Generate ${count} questions now:`;
 
   /**
    * Submit answer for a question
-   * 
-   * @param {string} sessionId - Session ID
-   * @param {string} userAnswer - User's answer
-   * @param {number} timeSpent - Time spent in seconds
-   * @returns {Promise<Object>} Answer result with correctness and points
    */
   async submitAnswer(sessionId, userAnswer, timeSpent) {
     try {
@@ -284,15 +246,10 @@ Generate ${count} questions now:`;
         throw new Error('No active question');
       }
 
-      // Check correctness
       const isCorrect = userAnswer.trim().toLowerCase() === question.correctAnswer.trim().toLowerCase();
-
-      // Calculate points
-      const timeLimit = 30; // Default 30 seconds per question
+      const timeLimit = 30;
       const points = this.calculateScore(isCorrect, sessionData.difficulty, timeSpent, timeLimit);
 
-      // Record answer in database
-      const session = await GameSession.findById(sessionId);
       await GameSession.recordAnswer(
         sessionId,
         question.question,
@@ -303,7 +260,6 @@ Generate ${count} questions now:`;
         points
       );
 
-      // Move to next question
       sessionData.currentQuestionIndex++;
 
       return {
@@ -321,22 +277,16 @@ Generate ${count} questions now:`;
 
   /**
    * Complete a session and calculate final results
-   * 
-   * @param {string} sessionId - Session ID
-   * @returns {Promise<Object>} Session results
    */
   async completeSession(sessionId) {
     try {
-      // Complete session in database
       const result = await GameSession.complete(sessionId);
-
-      // Clean up in-memory session data
       const sessionData = this.activeSessions.get(sessionId);
       this.activeSessions.delete(sessionId);
 
       const { session, answers } = result;
 
-      // Update progression tracking (streak, mastery, statistics)
+      // Update progression
       await progressionService.processSessionCompletion(
         session.user_id,
         session.category_id,
@@ -344,15 +294,14 @@ Generate ${count} questions now:`;
         session.total_questions
       );
 
-      // Add score to weekly league (Requirement 4.1)
+      // Add league score
       try {
         await leagueService.addScore(session.user_id, session.score);
       } catch (leagueError) {
         console.error('Failed to add league score:', leagueError);
-        // Don't fail the session completion if league update fails
       }
 
-      // Track telemetry for competition scoring
+      // Track telemetry
       try {
         const sessionStartTime = sessionData?.startTime || Date.now();
         const sessionDuration = Math.floor((Date.now() - sessionStartTime) / 1000);
@@ -360,7 +309,6 @@ Generate ${count} questions now:`;
           ? (session.correct_answers / session.total_questions) * 100
           : 0;
 
-        // Get category name
         const category = await Category.findById(session.category_id);
 
         await telemetryService.trackSession(
@@ -378,10 +326,8 @@ Generate ${count} questions now:`;
         );
       } catch (telemetryError) {
         console.error('Failed to track session telemetry:', telemetryError);
-        // Don't fail the session completion if telemetry fails
       }
 
-      // Calculate accuracy
       const accuracy = session.total_questions > 0
         ? (session.correct_answers / session.total_questions) * 100
         : 0;
@@ -410,67 +356,35 @@ Generate ${count} questions now:`;
 
   /**
    * Calculate score based on difficulty and speed
-   * 
-   * @param {boolean} isCorrect - Whether answer is correct
-   * @param {string} difficulty - Difficulty level
-   * @param {number} timeSpent - Time spent in seconds
-   * @param {number} timeLimit - Time limit in seconds
-   * @returns {number} Points earned
    */
   calculateScore(isCorrect, difficulty, timeSpent, timeLimit) {
     if (!isCorrect) return 0;
 
-    const basePoints = {
-      easy: 10,
-      medium: 20,
-      hard: 30,
-    };
-
+    const basePoints = { easy: 10, medium: 20, hard: 30 };
     const base = basePoints[difficulty] || basePoints.medium;
     const timeRatio = timeSpent / timeLimit;
 
-    // Speed multiplier
     let speedMultiplier = 1.0;
-    if (timeRatio < 0.25) speedMultiplier = 2.0;      // < 25% of time
-    else if (timeRatio < 0.50) speedMultiplier = 1.5; // < 50% of time
-    else if (timeRatio < 0.75) speedMultiplier = 1.2; // < 75% of time
+    if (timeRatio < 0.25) speedMultiplier = 2.0;
+    else if (timeRatio < 0.50) speedMultiplier = 1.5;
+    else if (timeRatio < 0.75) speedMultiplier = 1.2;
 
     return Math.floor(base * speedMultiplier);
   }
 
   /**
-   * Unlock explanation for a question (costs CREDITS_EXPLANATION_PACK)
-   * 
-   * @param {string} userId - User ID
-   * @param {string} sessionId - Session ID
-   * @param {string} gamePassToken - Orange Game Pass token
-   * @returns {Promise<Object>} Explanations for all questions
+   * Unlock explanation — FREE with active game pass
    */
-  async unlockExplanation(userId, sessionId, gamePassToken) {
+  async unlockExplanation(userId, sessionId) {
     try {
-      // Redeem credits
-      const creditCost = creditService.constructor.COSTS.EXPLANATION_PACK;
-      const redemptionResult = await creditService.redeemCredits(
-        userId,
-        creditCost,
-        'EXPLANATION_PACK',
-        gamePassToken,
-        { sessionId }
-      );
-
-      if (!redemptionResult.success) {
-        throw new Error(redemptionResult.message || 'Insufficient credits');
-      }
-
-      // Get session answers
       const answers = await GameSession.getAnswers(sessionId);
 
-      // Track telemetry for explanation pack usage
+      // Track telemetry
       try {
         await telemetryService.trackAIUsage(userId, 'explanation_pack', {
           sessionId,
-          creditsCharged: creditCost,
           questionsCount: answers.length,
+          cost: 'free_with_pass',
         });
       } catch (telemetryError) {
         console.error('Failed to track explanation pack telemetry:', telemetryError);
@@ -478,8 +392,7 @@ Generate ${count} questions now:`;
 
       return {
         success: true,
-        creditsCharged: creditCost,
-        newBalance: redemptionResult.newBalance,
+        free: true,
         explanations: answers.map(a => ({
           question: a.question_text,
           correctAnswer: a.correct_answer,
@@ -492,69 +405,46 @@ Generate ${count} questions now:`;
   }
 
   /**
-   * Eliminate two wrong answers (costs CREDITS_HINT_ELIMINATE)
-   * 
-   * @param {string} userId - User ID
-   * @param {string} sessionId - Session ID
-   * @param {number} questionIndex - Question index
-   * @param {string} gamePassToken - Orange Game Pass token
-   * @returns {Promise<Object>} Remaining options
+   * Eliminate two wrong answers — FREE with cooldown timer
    */
-  async eliminateWrongAnswers(userId, sessionId, questionIndex, gamePassToken) {
+  async eliminateWrongAnswers(userId, sessionId, questionIndex) {
     try {
+      // Check cooldown
+      const cooldown = this.checkHintCooldown(userId, 'eliminate');
+      if (cooldown.onCooldown) {
+        throw new Error(`Hint on cooldown. Please wait ${cooldown.remainingSeconds} seconds.`);
+      }
+
       const sessionData = this.activeSessions.get(sessionId);
       if (!sessionData) {
         throw new Error('Session not found or expired');
       }
 
-      // Check if hint already used for this question
       if (sessionData.usedHints.eliminate.includes(questionIndex)) {
         throw new Error('Eliminate hint already used for this question');
       }
 
-      // Redeem credits
-      const creditCost = creditService.constructor.COSTS.HINT_ELIMINATE;
-      const redemptionResult = await creditService.redeemCredits(
-        userId,
-        creditCost,
-        'HINT_ELIMINATE',
-        gamePassToken,
-        { sessionId, questionIndex }
-      );
-
-      if (!redemptionResult.success) {
-        throw new Error(redemptionResult.message || 'Insufficient credits');
-      }
-
       const question = sessionData.questions[questionIndex];
       const correctAnswer = question.correctAnswer;
-
-      // Find wrong answers
       const wrongAnswers = question.options.filter(opt => opt !== correctAnswer);
-
-      // Randomly select 2 wrong answers to eliminate
       const toEliminate = wrongAnswers.sort(() => 0.5 - Math.random()).slice(0, 2);
 
-      // Mark hint as used
       sessionData.usedHints.eliminate.push(questionIndex);
+      this.recordHintUsage(userId, 'eliminate');
 
-      // Track telemetry for hint usage
+      // Track telemetry
       try {
         await telemetryService.trackAIUsage(userId, 'hint_eliminate', {
-          sessionId,
-          questionIndex,
-          creditsCharged: creditCost,
+          sessionId, questionIndex, cost: 'free_with_pass',
         });
-      } catch (telemetryError) {
-        console.error('Failed to track hint telemetry:', telemetryError);
-      }
+      } catch (e) { /* ignore */ }
 
       return {
         success: true,
-        creditsCharged: creditCost,
-        newBalance: redemptionResult.newBalance,
+        free: true,
         eliminatedOptions: toEliminate,
         remainingOptions: question.options.filter(opt => !toEliminate.includes(opt)),
+        cooldownSeconds: this.HINT_COOLDOWNS.eliminate,
       };
     } catch (error) {
       throw new Error(`Failed to eliminate wrong answers: ${error.message}`);
@@ -562,43 +452,27 @@ Generate ${count} questions now:`;
   }
 
   /**
-   * Get AI-generated contextual clue (costs CREDITS_HINT_CLUE)
-   * 
-   * @param {string} userId - User ID
-   * @param {string} sessionId - Session ID
-   * @param {number} questionIndex - Question index
-   * @param {string} gamePassToken - Orange Game Pass token
-   * @returns {Promise<Object>} Contextual clue
+   * Get AI-generated contextual clue — FREE with cooldown timer
    */
-  async getContextualClue(userId, sessionId, questionIndex, gamePassToken) {
+  async getContextualClue(userId, sessionId, questionIndex) {
     try {
+      // Check cooldown
+      const cooldown = this.checkHintCooldown(userId, 'clue');
+      if (cooldown.onCooldown) {
+        throw new Error(`Hint on cooldown. Please wait ${cooldown.remainingSeconds} seconds.`);
+      }
+
       const sessionData = this.activeSessions.get(sessionId);
       if (!sessionData) {
         throw new Error('Session not found or expired');
       }
 
-      // Check if hint already used for this question
       if (sessionData.usedHints.clue.includes(questionIndex)) {
         throw new Error('Clue hint already used for this question');
       }
 
-      // Redeem credits
-      const creditCost = creditService.constructor.COSTS.HINT_CLUE;
-      const redemptionResult = await creditService.redeemCredits(
-        userId,
-        creditCost,
-        'HINT_CLUE',
-        gamePassToken,
-        { sessionId, questionIndex }
-      );
-
-      if (!redemptionResult.success) {
-        throw new Error(redemptionResult.message || 'Insufficient credits');
-      }
-
       const question = sessionData.questions[questionIndex];
 
-      // Generate clue via Gemini
       const prompt = `Generate a helpful but not too obvious clue for this trivia question:
 
 Question: ${question.question}
@@ -612,25 +486,21 @@ Provide a single sentence clue that hints at the answer without giving it away d
       });
       const clue = result.text.trim();
 
-      // Mark hint as used
       sessionData.usedHints.clue.push(questionIndex);
+      this.recordHintUsage(userId, 'clue');
 
-      // Track telemetry for hint usage
+      // Track telemetry
       try {
         await telemetryService.trackAIUsage(userId, 'hint_clue', {
-          sessionId,
-          questionIndex,
-          creditsCharged: creditCost,
+          sessionId, questionIndex, cost: 'free_with_pass',
         });
-      } catch (telemetryError) {
-        console.error('Failed to track hint telemetry:', telemetryError);
-      }
+      } catch (e) { /* ignore */ }
 
       return {
         success: true,
-        creditsCharged: creditCost,
-        newBalance: redemptionResult.newBalance,
+        free: true,
         clue,
+        cooldownSeconds: this.HINT_COOLDOWNS.clue,
       };
     } catch (error) {
       throw new Error(`Failed to get contextual clue: ${error.message}`);
@@ -638,63 +508,44 @@ Provide a single sentence clue that hints at the answer without giving it away d
   }
 
   /**
-   * Reveal first letter of correct answer (costs CREDITS_HINT_FIRST_LETTER)
-   * 
-   * @param {string} userId - User ID
-   * @param {string} sessionId - Session ID
-   * @param {number} questionIndex - Question index
-   * @param {string} gamePassToken - Orange Game Pass token
-   * @returns {Promise<Object>} First letter hint
+   * Reveal first letter of correct answer — FREE with cooldown timer
    */
-  async revealFirstLetter(userId, sessionId, questionIndex, gamePassToken) {
+  async revealFirstLetter(userId, sessionId, questionIndex) {
     try {
+      // Check cooldown
+      const cooldown = this.checkHintCooldown(userId, 'firstLetter');
+      if (cooldown.onCooldown) {
+        throw new Error(`Hint on cooldown. Please wait ${cooldown.remainingSeconds} seconds.`);
+      }
+
       const sessionData = this.activeSessions.get(sessionId);
       if (!sessionData) {
         throw new Error('Session not found or expired');
       }
 
-      // Check if hint already used for this question
       if (sessionData.usedHints.firstLetter.includes(questionIndex)) {
         throw new Error('First letter hint already used for this question');
-      }
-
-      // Redeem credits
-      const creditCost = creditService.constructor.COSTS.HINT_FIRST_LETTER;
-      const redemptionResult = await creditService.redeemCredits(
-        userId,
-        creditCost,
-        'HINT_FIRST_LETTER',
-        gamePassToken,
-        { sessionId, questionIndex }
-      );
-
-      if (!redemptionResult.success) {
-        throw new Error(redemptionResult.message || 'Insufficient credits');
       }
 
       const question = sessionData.questions[questionIndex];
       const firstLetter = question.correctAnswer.charAt(0).toUpperCase();
 
-      // Mark hint as used
       sessionData.usedHints.firstLetter.push(questionIndex);
+      this.recordHintUsage(userId, 'firstLetter');
 
-      // Track telemetry for hint usage
+      // Track telemetry
       try {
         await telemetryService.trackAIUsage(userId, 'hint_first_letter', {
-          sessionId,
-          questionIndex,
-          creditsCharged: creditCost,
+          sessionId, questionIndex, cost: 'free_with_pass',
         });
-      } catch (telemetryError) {
-        console.error('Failed to track hint telemetry:', telemetryError);
-      }
+      } catch (e) { /* ignore */ }
 
       return {
         success: true,
-        creditsCharged: creditCost,
-        newBalance: redemptionResult.newBalance,
+        free: true,
         firstLetter,
         hint: `The correct answer starts with "${firstLetter}"`,
+        cooldownSeconds: this.HINT_COOLDOWNS.firstLetter,
       };
     } catch (error) {
       throw new Error(`Failed to reveal first letter: ${error.message}`);
@@ -702,18 +553,14 @@ Provide a single sentence clue that hints at the answer without giving it away d
   }
 
   /**
-   * Format question for response
-   * 
-   * @param {Object} question - Question object
-   * @param {number} index - Question index
-   * @returns {Object} Formatted question
+   * Format question for response (no correct answer exposed)
    */
   formatQuestion(question, index) {
     return {
       index,
       question: question.question,
       options: question.options,
-      timeLimit: 30, // Default 30 seconds
+      timeLimit: 30,
     };
   }
 }

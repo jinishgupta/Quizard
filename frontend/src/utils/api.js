@@ -2,7 +2,6 @@ const API_URL = import.meta.env.VITE_API_URL;
 
 /**
  * Get the Orange Game Pass token from sessionStorage
- * This token is captured from the URL when the user enters the app
  */
 const getGamePassToken = () => {
   return sessionStorage.getItem('game_pass_token');
@@ -22,14 +21,13 @@ const addRefreshSubscriber = (callback) => {
 
 /**
  * Get the Bedrock Passport token from localStorage
- * Bedrock Passport can store tokens under different keys depending on auth method
  */
 const getBedrockToken = () => {
   // First try the standard key we set in AuthContext
   let token = localStorage.getItem('bedrock_passport_token');
   if (token) return token;
   
-  // Try other possible keys where Bedrock Passport might store the token
+  // Try other possible keys
   const possibleKeys = [
     'bedrockPassportToken',
     'bp_token',
@@ -38,12 +36,10 @@ const getBedrockToken = () => {
   
   for (const key of possibleKeys) {
     token = localStorage.getItem(key);
-    if (token) {
-      return token;
-    }
+    if (token) return token;
   }
   
-  // Also check if token is stored in a JSON object
+  // Check JSON storage
   try {
     const bedrockData = localStorage.getItem('bedrock_passport_user');
     if (bedrockData) {
@@ -56,14 +52,12 @@ const getBedrockToken = () => {
     // Ignore parse errors
   }
   
-  // Last resort: check all localStorage keys for anything that looks like a JWT
+  // Last resort: scan for JWT tokens
   try {
     for (let i = 0; i < localStorage.length; i++) {
       const key = localStorage.key(i);
       const value = localStorage.getItem(key);
-      // JWT tokens start with "eyJ"
       if (value && typeof value === 'string' && value.startsWith('eyJ') && value.split('.').length === 3) {
-        console.log('Found potential JWT token in localStorage key:', key);
         return value;
       }
     }
@@ -87,18 +81,14 @@ const getBedrockRefreshToken = () => {
   
   for (const key of possibleKeys) {
     const token = localStorage.getItem(key);
-    if (token) {
-      return token;
-    }
+    if (token) return token;
   }
   
   try {
     const bedrockData = localStorage.getItem('bedrock_passport_user');
     if (bedrockData) {
       const parsed = JSON.parse(bedrockData);
-      if (parsed.refreshToken) {
-        return parsed.refreshToken;
-      }
+      if (parsed.refreshToken) return parsed.refreshToken;
     }
   } catch (e) {
     // Ignore parse errors
@@ -119,9 +109,7 @@ const refreshAccessToken = async () => {
 
   const response = await fetch(`${API_URL}/api/auth/refresh`, {
     method: 'POST',
-    headers: {
-      'Content-Type': 'application/json',
-    },
+    headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({ refreshToken }),
   });
 
@@ -145,13 +133,6 @@ const refreshAccessToken = async () => {
 export const apiRequest = async (endpoint, options = {}) => {
   const token = getBedrockToken();
   
-  // Debug logging
-  if (!token) {
-    console.warn('No Bedrock token found in localStorage');
-  } else {
-    console.log('Sending request with token (first 20 chars):', token.substring(0, 20) + '...');
-  }
-  
   const defaultHeaders = {
     'Content-Type': 'application/json',
   };
@@ -160,7 +141,7 @@ export const apiRequest = async (endpoint, options = {}) => {
     defaultHeaders['Authorization'] = `Bearer ${token}`;
   }
 
-  // Attach Orange Game Pass token for credit redemption
+  // Attach Orange Game Pass token
   const gamePassToken = getGamePassToken();
   if (gamePassToken) {
     defaultHeaders['X-Game-Pass-Token'] = gamePassToken;
@@ -175,6 +156,20 @@ export const apiRequest = async (endpoint, options = {}) => {
   };
 
   const response = await fetch(`${API_URL}${endpoint}`, config);
+
+  // Handle 403 Game Pass Expired
+  if (response.status === 403) {
+    const errorData = await response.json().catch(() => ({}));
+    if (errorData.error === 'GAME_PASS_EXPIRED') {
+      // Dispatch custom event so GamePassContext can handle it
+      window.dispatchEvent(new CustomEvent('gamepass:expired', { detail: errorData }));
+      throw new Error('Game Pass has expired. Please purchase a new one.');
+    }
+    if (errorData.error === 'GAME_PASS_REQUIRED') {
+      throw new Error('Game Pass required. Please access the app via your Game Pass link.');
+    }
+    throw new Error(errorData.message || 'Access forbidden');
+  }
 
   // Handle 401 Unauthorized - token expired
   if (response.status === 401 && token) {
@@ -198,7 +193,6 @@ export const apiRequest = async (endpoint, options = {}) => {
         return retryResponse.json();
       } catch (error) {
         isRefreshing = false;
-        // Clear tokens and redirect to login
         localStorage.removeItem('bedrock_passport_token');
         localStorage.removeItem('bedrock_passport_refresh_token');
         localStorage.removeItem('bedrock_passport_user');
@@ -206,7 +200,6 @@ export const apiRequest = async (endpoint, options = {}) => {
         throw error;
       }
     } else {
-      // Wait for token refresh to complete
       return new Promise((resolve, reject) => {
         addRefreshSubscriber(async (newToken) => {
           try {
@@ -235,16 +228,12 @@ export const apiRequest = async (endpoint, options = {}) => {
   return response.json();
 };
 
-/**
- * GET request
- */
+/** GET request */
 export const get = (endpoint, options = {}) => {
   return apiRequest(endpoint, { ...options, method: 'GET' });
 };
 
-/**
- * POST request
- */
+/** POST request */
 export const post = (endpoint, data, options = {}) => {
   return apiRequest(endpoint, {
     ...options,
@@ -253,9 +242,7 @@ export const post = (endpoint, data, options = {}) => {
   });
 };
 
-/**
- * PUT request
- */
+/** PUT request */
 export const put = (endpoint, data, options = {}) => {
   return apiRequest(endpoint, {
     ...options,
@@ -264,9 +251,7 @@ export const put = (endpoint, data, options = {}) => {
   });
 };
 
-/**
- * DELETE request
- */
+/** DELETE request */
 export const del = (endpoint, options = {}) => {
   return apiRequest(endpoint, { ...options, method: 'DELETE' });
 };

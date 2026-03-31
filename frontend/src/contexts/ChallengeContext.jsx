@@ -203,14 +203,11 @@ export const ChallengeProvider = ({ children }) => {
     setOpponentAnswered(false);
   };
 
-  // Reset state when new question arrives
+  // Reset challenge-level state when a new question arrives
   useEffect(() => {
     if (currentQuestion) {
-      setSelectedAnswer(null);
-      setHasAnswered(false);
       setAnswerResult(null);
-      setTimeLeft(currentQuestion.timeLimit || 30);
-      setQuestionStartTime(Date.now());
+      setOpponentAnswered(false);
     }
   }, [currentQuestion]);
 

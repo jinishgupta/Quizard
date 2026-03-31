@@ -9,6 +9,7 @@ import './styles/tailwind.css';
 // Context
 import { AuthProvider } from './contexts/AuthContext';
 import { ChallengeProvider } from './contexts/ChallengeContext';
+import { GamePassProvider } from './contexts/GamePassContext';
 
 // Components
 import ProtectedRoute from './components/ProtectedRoute';
@@ -29,6 +30,14 @@ import NotFound from './pages/NotFound';
 
 const queryClient = new QueryClient();
 
+// Wagmi configuration
+const wagmiConfig = createConfig({
+  chains: [mainnet],
+  transports: {
+    [mainnet.id]: http(),
+  },
+});
+
 // Global variable to track WalletConnect initialization
 let walletConnectInitialized = false;
 
@@ -45,7 +54,7 @@ console.warn = function(msg, ...args) {
   originalConsoleWarn(msg, ...args);
 };
 
-// PassportProvider wrapper component
+// PassportProvider wrapper component — reads config from env vars
 const PassportProvider = ({ children }) => {
   const [isReady, setIsReady] = useState(false);
   const [providerInstance, setProviderInstance] = useState(null);
@@ -77,10 +86,10 @@ const PassportProvider = ({ children }) => {
 
   return isReady ? (
     <BedrockPassportProvider
-      baseUrl="https://api.bedrockpassport.com"
-      authCallbackUrl="https://quizard-gljo.onrender.com/auth/callback"
-      tenantId="orangeid-zEFEgXMII3"
-      subscriptionKey="65c863c47911431abbc97f610f0fbba1"
+      baseUrl={import.meta.env.VITE_BEDROCK_BASE_URL || "https://api.bedrockpassport.com"}
+      authCallbackUrl={import.meta.env.VITE_BEDROCK_AUTH_CALLBACK_URL || "https://quizard-gljo.onrender.com/auth/callback"}
+      tenantId={import.meta.env.VITE_BEDROCK_TENANT_ID || "orangeid-zEFEgXMII3"}
+      subscriptionKey={import.meta.env.VITE_BEDROCK_SUBSCRIPTION_KEY || "65c863c47911431abbc97f610f0fbba1"}
       redirectionState={{}}
       passportOptions={{
         autoConnect: !walletConnectInitialized,
@@ -113,46 +122,36 @@ function App() {
     }
   }, []);
 
-  // Wagmi configuration
-  const config = createConfig({
-    chains: [mainnet],
-    transports: {
-      [mainnet.id]: http(),
-    },
-  });
-
   return (
-    <WagmiProvider config={config}>
+    <WagmiProvider config={wagmiConfig}>
       <QueryClientProvider client={queryClient}>
         <PassportProvider>
           <Router>
             <AuthProvider>
-              <ChallengeProvider>
-                <div className="bg-[#0A0F1A] text-white antialiased">
-                  <Routes>
-                    {/* Public Routes */}
-                    <Route path="/login" element={<Login />} />
-                    <Route path="/auth/callback" element={<AuthCallback />} />
-                    <Route path="/auth/test" element={<ProtectedRoute><AuthTest /></ProtectedRoute>} />
-                    
-                    {/* Protected Routes */}
-                    <Route path="/" element={<Navigate to="/home-dashboard" replace />} />
-                    <Route path="/home-dashboard" element={<ProtectedRoute><HomeDashboard /></ProtectedRoute>} />
-                    <Route path="/categories" element={<ProtectedRoute><Categories /></ProtectedRoute>} />
-                    <Route path="/challenge" element={<ProtectedRoute><Challenge /></ProtectedRoute>} />
-                    <Route path="/challenge/play" element={<ProtectedRoute><ChallengePlay /></ProtectedRoute>} />
-                    <Route path="/leagues" element={<ProtectedRoute><Leagues /></ProtectedRoute>} />
-                    <Route path="/profile" element={<ProtectedRoute><Profile /></ProtectedRoute>} />
-                    <Route path="/play-screen" element={<ProtectedRoute><PlayScreen /></ProtectedRoute>} />
-                    <Route path="/results-screen" element={<ProtectedRoute><ResultsScreen /></ProtectedRoute>} />
-                    <Route path="*" element={<NotFound />} />
-                  </Routes>
-                  
-                  {/* Rocket scripts */}
-                  <script type="module" async src="https://static.rocket.new/rocket-web.js?_cfg=https%3A%2F%2Faitriviale2100back.builtwithrocket.new&_be=https%3A%2F%2Fappanalytics.rocket.new&_v=0.1.17" />
-                  <script type="module" defer src="https://static.rocket.new/rocket-shot.js?v=0.0.2" />
-                </div>
-              </ChallengeProvider>
+              <GamePassProvider>
+                <ChallengeProvider>
+                  <div className="bg-[#0A0F1A] text-white antialiased">
+                    <Routes>
+                      {/* Public Routes */}
+                      <Route path="/login" element={<Login />} />
+                      <Route path="/auth/callback" element={<AuthCallback />} />
+                      <Route path="/auth/test" element={<ProtectedRoute><AuthTest /></ProtectedRoute>} />
+                      
+                      {/* Protected Routes */}
+                      <Route path="/" element={<Navigate to="/home-dashboard" replace />} />
+                      <Route path="/home-dashboard" element={<ProtectedRoute><HomeDashboard /></ProtectedRoute>} />
+                      <Route path="/categories" element={<ProtectedRoute><Categories /></ProtectedRoute>} />
+                      <Route path="/challenge" element={<ProtectedRoute><Challenge /></ProtectedRoute>} />
+                      <Route path="/challenge/play" element={<ProtectedRoute><ChallengePlay /></ProtectedRoute>} />
+                      <Route path="/leagues" element={<ProtectedRoute><Leagues /></ProtectedRoute>} />
+                      <Route path="/profile" element={<ProtectedRoute><Profile /></ProtectedRoute>} />
+                      <Route path="/play-screen" element={<ProtectedRoute><PlayScreen /></ProtectedRoute>} />
+                      <Route path="/results-screen" element={<ProtectedRoute><ResultsScreen /></ProtectedRoute>} />
+                      <Route path="*" element={<NotFound />} />
+                    </Routes>
+                  </div>
+                </ChallengeProvider>
+              </GamePassProvider>
             </AuthProvider>
           </Router>
         </PassportProvider>
