@@ -8,13 +8,13 @@ export default function StreakDisplay({ streakCount, weekHistory, compact = fals
     <div
       className={`flex items-center ${compact ? 'gap-2' : 'gap-4'} px-4 py-3 rounded-2xl`}
       style={{
-        background: 'linear-gradient(135deg, rgba(249,115,22,0.12), rgba(234,88,12,0.08))',
-        border: '1px solid rgba(249,115,22,0.2)',
+        background: 'linear-gradient(135deg, rgba(59,130,246,0.12), rgba(37,99,235,0.08))',
+        border: '1px solid rgba(59,130,246,0.2)',
       }}
     >
       <div className="flex items-center gap-1.5">
-        <Flame size={compact ? 16 : 20} className="text-primary-400" style={{ filter: 'drop-shadow(0 0 6px rgba(249,115,22,0.6))' }} />
-        <span className={`font-mono font-bold tabular-nums ${compact ? 'text-base' : 'text-xl'} text-primary-400`}>
+        <Flame size={compact ? 16 : 20} className="text-blue-500" style={{ filter: 'drop-shadow(0 0 6px rgba(59,130,246,0.6))' }} />
+        <span className={`font-mono font-bold tabular-nums ${compact ? 'text-base' : 'text-xl'} text-blue-500`}>
           {streakCount}
         </span>
         {!compact && <span className="text-xs text-gray-400 font-medium">day streak</span>}

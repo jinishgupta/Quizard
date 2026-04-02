@@ -68,6 +68,13 @@ export const useCategories = () => {
   });
 };
 
+export const useRecentRounds = (limit = 3) => {
+  return useQuery({
+    queryKey: ['recentRounds', limit],
+    queryFn: () => get(`/api/game/history?limit=${limit}`),
+  });
+};
+
 export const useCreateSession = () => {
   const queryClient = useQueryClient();
   

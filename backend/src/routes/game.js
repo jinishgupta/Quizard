@@ -449,4 +449,41 @@ router.post('/hint/first-letter', authenticate, requireActiveGamePass, async (re
   }
 });
 
+/**
+ * GET /api/game/history
+ * Get user's recent game sessions
+ */
+router.get('/history', authenticate, async (req, res) => {
+  try {
+    const limit = parseInt(req.query.limit) || 3;
+    const sessions = await GameSession.getUserSessions(req.user.id, limit);
+
+    const history = sessions.map(session => {
+      // Calculate dynamic accuracy
+      const accuracy = session.total_questions > 0 
+        ? (session.correct_answers / session.total_questions) * 100 
+        : 0;
+
+      return {
+        id: session.id,
+        categoryId: session.category_id,
+        categoryName: session.categories?.name || 'Custom Quiz',
+        score: session.score,
+        accuracy: accuracy,
+        completedAt: session.completed_at,
+      };
+    });
+
+    res.json({
+      success: true,
+      history,
+    });
+  } catch (error) {
+    res.status(500).json({
+      error: 'Failed to get game history',
+      message: error.message,
+    });
+  }
+});
+
 export default router;
